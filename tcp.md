@@ -1,10 +1,19 @@
 
+## TCP转移图
+
+![20200927182536](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200927182536.png)
+
+
+
+
+
 
 - TCP与UDP的区别，
 - TCP三次握手四次分手的作用是什么
   - 初始化资源，同步信息sequence号
     - 如果两次握手会发生什么？
       - 那么本来已经无效的数据，重新到达对方，导致错误，在这里如果客户端，第一个SYN信号在网络中，延迟，客户端重新发起了连接，然后发送数据，然后关闭，这个时候第一次SYN信号才到达，那么两个握手的话，服务端会认为客户端重新发起了连接导致，服务端白白消耗资源。
+      - 防止已失效的**连接请求**报文段，又传送到了服务端。
   - 回收资源,通知对方，我不发送数据了
   
 - 流量控制与拥塞控制
@@ -40,12 +49,17 @@
   - how：发送数据之前先发送信息的大小，接收方接收的时候，先接收它的长度信息，然后根据长度接收数据
 
 
+### 计时器
+
+![clock_tcp](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/clock_tcp.png)
 
 
 
+## 附录
 
+### 一些问题
 
-
+![tcp](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/tcp.png)
 
 
 
