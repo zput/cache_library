@@ -1,4 +1,81 @@
 
+- 数据结构
+
+- 常用关键字
+  - for 和 range
+  - select
+  - defer
+  - panic 和 recover
+  - make 和 new
+
+- 并发编程
+
+- 内存
+
+### 方法
+
+- 为指针类型属主隐式声明的**方法**
+  - 每个**方法**对应着一个隐式声明的函数
+  - ```类型T```的方法集总是```类型*T```的方法集的子集。
+    - ![20201218212611](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201218212611.png)
+
+- 如何决定一个方法声明使用值类型属主还是指针类型属主？
+  ```go
+	package main
+
+	import "fmt"
+
+	type Book struct {
+		pages int
+	}
+
+	type Books []Book
+
+	func (books *Books) Modify() {
+		*books = append(*books, Book{789})
+		(*books)[0].pages = 500
+	}
+
+	func main() {
+		var books = Books{{123}, {456}}
+		books.Modify()
+		fmt.Println(books) // [{500} {456} {789}]
+	}
+  ```
+
+- ```(&book).SetPages(123)```一行为什么可以被简化为```book.SetPages(123)```呢？
+  - **毕竟，类型Book并不拥有一个SetPages方法。**
+  - 这可以看作是Go中为了让代码看上去更简洁而特别设计的语法糖。
+    - 此语法糖只对可寻址的值类型的属主有效。 编译器会自动将```book.SetPages(123)```改写为```(&book).SetPages(123)```。 
+	- 但另一方面，我们应该总是认为```aBookExpression.SetPages```是一个合法的选择器（从语法层面讲），即使表达式```aBookExpression```被估值为一个不可寻址的Book值（在这种情况下，```aBookExpression.SetPages```是一个无效但合法的选择器）。
+    ```go
+    package main
+    import "fmt"
+    type Book struct {
+    	pages int
+    }
+    func (b Book) Pages() int {
+    	return b.pages
+    }
+    func (b *Book) SetPages(pages int) {
+    	b.pages = pages
+    }
+    func main() {
+    	var book Book
+    	fmt.Printf("%T \n", book.Pages)       // func() int
+    	fmt.Printf("%T \n", (&book).SetPages) // func(int)
+    	// &book值有一个隐式方法Pages。
+    	fmt.Printf("%T \n", (&book).Pages)    // func() int
+
+    	// 调用这三个方法。
+    	(&book).SetPages(123)
+    	book.SetPages(123)           // 等价于上一行
+    	fmt.Println(book.Pages())    // 123
+    	fmt.Println((&book).Pages()) // 123
+    }
+    ```
+[方法](https://gfw.go101.org/article/method.html)
+
 ### 1. new And make
 
 
@@ -113,7 +190,7 @@ panic: runtime error: invalid memory address or nil pointer dereference
 [There Are No Reference Types in Go](https://www.tapirgames.com/blog/golang-has-no-reference-values)
 [About the terminology "reference type" in Go](https://github.com/go101/go101/wiki/About-the-terminology-%22reference-type%22-in-Go)
 
-### 计算golang中类型的大小的方式
+### 3. 计算golang中类型的大小的方式
 
 - struct会不会有填充的（padding）的bit?
   - 会的，就像下方的例子中，T.B就是一个bit,但是它后面填充了7个bit.
@@ -203,10 +280,80 @@ func main() {
 }
 ```
 
+### golang的chan
+
+- ![20201217212124](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217212124.png)
+
+- what:
+  - 通道的主要作用是用来实现并发同步
+  - 可以把一个通道看作是在一个程序内部的一个先进先出（FIFO：first in first out）数据队列。 一些协程可以向此通道发送数据，另外一些协程可以从此通道接收数据。
+    - channel类型与值
+	  - 字面形式chan T表示一个元素类型为T的双向通道类型。 编译器允许从此类型的值中接收和向此类型的值中发送数据。
+      - 字面形式chan<- T表示一个元素类型为T的单向发送通道类型。 编译器不允许从此类型的值中接收数据。
+      - 字面形式<-chan T表示一个元素类型为T的单向接收通道类型。 编译器不允许向此类型的值中发送数据。
+	    - **类型T**总是放在最后面。
+      - 我们了解到一个通道值可能含有底层部分。 当一个通道值被赋给另一个通道值后，这两个通道值将共享相同的底层部分。
 
 
 
-### golang中同步的方式
+- why:
+  - 一个通道内部维护了**三个队列**（均可被视为先进先出队列）：
+    - 接收数据协程队列（可以看做是先进先出队列但其实并不完全是，见下面解释）。此队列是一个没有长度限制的链表。 此队列中的协程均处于阻塞状态，它们正等待着从此通道接收数据。
+    - 发送数据协程队列（可以看做是先进先出队列但其实并不完全是，见下面解释）。此队列也是一个没有长度限制的链表。 此队列中的协程亦均处于阻塞状态，它们正等待着向此通道发送数据。 此队列中的每个协程将要发送的值（或者此值的指针，取决于具体编译器实现）和此协程一起存储在此队列中。
+    - 数据缓冲队列。这是一个循环队列（绝对先进先出），它的长度为此通道的容量。此队列中存放的值的类型都为此通道的元素类型。 如果此队列中当前存放的值的个数已经达到此通道的容量，则我们说此通道已经处于满槽状态。 如果此队列中当前存放的值的个数为零，则我们说此通道处于空槽状态。 对于一个非缓冲通道（容量为零），它总是同时处于满槽状态和空槽状态。
+
+操作 | 一个零值nil通道 | 一个非零值但已关闭的通道 | 一个非零值且尚未关闭的通道
+---|-----------|--------------|--------------
+关闭 | **产生恐慌** | **产生恐慌** | 成功关闭(C)
+发送数据 | 永久阻塞(**I**) | **产生恐慌** | 阻塞或者成功发送(B)
+接收数据 | 永久阻塞(**II**) | 永不阻塞(D) | 阻塞或者成功接收(A)
+
+
+看下**I**: 直接看下发送数据的源码
+[walkexpr](https://github.com/golang/go/blob/da54dfb6a1f3bef827b9ec3780c98fde77a97d11/src/cmd/compile/internal/gc/walk.go#L1562) --> [chansend1](https://github.com/golang/go/blob/e35876ec6591768edace6c6f3b12646899fd1b11/src/runtime/chan.go#L126) --> [chansend](https://github.com/golang/go/blob/e35876ec6591768edace6c6f3b12646899fd1b11/src/runtime/chan.go#L147)
+
+```go
+func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
+	if c == nil {
+		if !block {
+			return false
+		}
+		// 这里面直接进入睡眠，永远阻塞 
+		gopark(nil, nil, waitReasonChanSendNilChan, traceEvGoStop, 2)
+		throw("unreachable")
+	}
+//...
+```
+
+- how:
+  - 五种操作：
+    - ```close(ch)```
+	- ```ch <- v```
+	- ```<-ch```
+	  - ```v = <-ch```
+	  - ```v, sentBeforeClosed = <-ch```
+    - ```cap(ch)```
+    - ```len(ch)```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 4. golang中同步的方式
 
 - what:
   - 并发同步是指如何控制若干并发计算（在Go中，即协程），从而
@@ -218,7 +365,6 @@ func main() {
   - 避免在它们无所事事的时候消耗CPU资源。
 - how:
   - 通道用例大全
-    - ![20201217212124](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217212124.png)
   - 如何优雅地关闭通道
   - [sync标准库包中提供的并发同步技术](https://gfw.go101.org/article/concurrent-synchronization-more.html)
     - sync.WaitGroup（等待组）类型: ：Add(delta int)、Done()和Wait()
@@ -272,7 +418,7 @@ func main() {
 
 
 
-### golang逃逸分析
+### 5. golang逃逸分析
 
 - what:
   - 逃逸分析是一种确定指针动态范围的方法，可以分析在程序的哪些地方可以访问到指针。
@@ -292,5 +438,33 @@ func main() {
 
 [Golang逃逸分析](https://cloud.tencent.com/developer/article/1165660)
 [GoLang-逃逸分析](https://www.jianshu.com/p/ad9dbc81a0aa)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

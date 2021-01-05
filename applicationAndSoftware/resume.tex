@@ -3,7 +3,7 @@
 % !Mode:: "TeX:UTF-8"
 
 \documentclass{resume}
-\usepackage{zh_CN-Adobefonts_external} % Simplified Chinese Support using external fonts (./fonts/zh_CN-Adobe/)
+\usepackage{zh_CN-Adobefonts_external} % Simplified Chinese Support using external fonts (。/fonts/zh_CN-Adobe/)
 %\usepackage{zh_CN-Adobefonts_internal} % Simplified Chinese Support using system fonts
 \usepackage{linespacing_fix} % disable extra space before next section
 \usepackage{cite}
@@ -16,42 +16,59 @@
 
 % {E-mail}{mobilephone}{homepage}
 % be careful of _ in emaill address
-\contactInfo{(+86) 177-1164-4027}{ffzxc.do@gmail.com}{GitHub @zput}{}
+\contactInfo{(+86) 177-1164-4027}{ffzxc。do@gmail。com}{GitHub @zput}{}
 % {E-mail}{mobilephone}
 % keep the last empty braces!
-%\contactInfo{xxx@yuanbin.me}{(+86) 131-221-87xxx}{}
+%\contactInfo{xxx@yuanbin。me}{(+86) 131-221-87xxx}{}
  
 \section{个人信息}
-\begin{itemize}[parsep=0.2ex]
+\begin{itemize}[parsep=0。2ex]
   \item 赵轩超/男/1993-12
-  \item 本科/湖南理工学院/自动化(2012.09-2016.06)
-  \item 技术博客:zput.github.io
-  \item Github:http://github.zput
+  \item 本科/湖南理工学院/自动化(2012。09-2016。06)
+  \item 技术博客:zput。github。io
+  \item Github:http://github。zput
 \end{itemize}
 
 \section{工作经历}
-\datedsubsection{\textbf{深圳云之梦科技有限公司}, 平台架构部golang开发工程师}{2018.9-2019.7}
-\begin{itemize}[parsep=0.2ex]
-  \item 开发小程序,微信公众号,淘宝内的H5架构平台.
-  \item 为商户提供公司的开放平台接口.
-  \item 为外部商家提供总店门店操作, 会员注册, 衣服商品CRUD操作, 提供与线下设备传输交流打通3D试衣等功能等开放平台的API.
-  \item 可扩展性的的小程序,H5的公共平台.
+
+\datedsubsection{\textbf{深圳九维智慧科技有限 公司}， 平台架构部golang开发工程师}{2019。7-至今}
+\begin{itemize}[parsep=0。2ex]
+\item 企业上云，整合服务，整理路由，上k8s。当时有十几个beego独立的微服务，前端调用的相同前缀URI但不同后缀的接口，可能分布在几个微服务中，无法进行负载均衡，分散流量，作为发起者，与前端商讨路由整合重构后缩减微服务到7个，并编写helm，服务都上到k8s，(\url(helm参考))。性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
+%  - 2019-10-24 22:03:00
+
+\item 规划编写服务CI/CD基于gitlab自动发布k8s流程。其中包括。gitlab-ci。yml的编写，gitlab-runner部署以及它默认docker等（\url{https://zput。github。io/2020/01/22/tool/gitlab/learn_gitlab/})。当自动发布上线后，开发打包部署到交给测试人员测试，从至少15分钟，降低到5分钟内。
+%  - 2020-01-22 20:09:00
+%  - 2020-02-25 21:06:00
+
+\item 构建基于go-micro后台微服务框架。为适应团队新的开发流程，和兼容以前的服务与小程序，对外提供了grp与grpc-gw(json)两个服务，内部模块分为API层（）， work层（），core层（），内部服务交流直接使用的go-micro自带提供的。参与整个框架制定，实现对外提供的两个服务（grpc，grpc-gw）与core层等，开发调研了服务周边的设施（log， token， sql driver）， 缩短与前端对接时间，定好*。proto协议，即可分发给个模块人员。
+%  - 2020-04-25 22:16:00
+
+\item  参与公司两条新产品AI线，语文课的开发。领导参与的主要模块包括登录相关，权限相关， 课程，题库，学生排课，作业，公众号提醒与消息推送等， 学生人数从0到1。5万人数增长。现在为这两条线的后台项目负责人，开发新需求与维护线上服务稳定。
+%  - 2020-08-15 20:16:00
 \end{itemize}
 
-\datedsubsection{\textbf{深圳优科数字化制造有限公司}, 研发工程师}{2016.6-2018.9}
-\begin{itemize}[parsep=0.2ex]
-  \item 与前端或微信小程序连接的多线程后端C++开发, 工业软件的数据通信的开发, 与AGV等智能设备数据连接的开发.
+\datedsubsection{\textbf{深圳云之梦科技有限公司}， 平台架构部golang开发工程师}{2018。9-2019。7}
+\begin{itemize}[parsep=0。2ex]
+  \item 开发小程序，微信公众号，淘宝内的H5架构平台。
+  \item 为商户提供公司的开放平台接口。
+  \item 为外部商家提供总店门店操作， 会员注册， 衣服商品CRUD操作， 提供与线下设备传输交流打通3D试衣等功能等开放平台的API。
+  \item 可扩展性的的小程序，H5的公共平台。
+\end{itemize}
+
+\datedsubsection{\textbf{深圳优科数字化制造有限公司}， 研发工程师}{2016。6-2018。9}
+\begin{itemize}[parsep=0。2ex]
+  \item 与前端或微信小程序连接的多线程后端C++开发， 工业软件的数据通信的开发， 与AGV等智能设备数据连接的开发。
 \end{itemize}
 
 \section{一些开源项目}
-\begin{itemize}[parsep=0.2ex]
-  \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件.(\url{https://github.com/zput/innodb\_view})
-    \begin{itemize}[parsep=0.2ex]
-        \item TODO
+\begin{itemize}[parsep=0。2ex]
+  \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件。(\url{https://github。com/zput/innodb\_view})
+    \begin{itemize}[parsep=0。2ex]
+        \item Innodb_view是一个直接访问MySQL InnoDB存储引擎文件的Golang实现。通过命令行可以遍历所有已经使用的页，分析每个页的类型; 分析Inode page页面组成;Index page页面的组成等。此外，这个项目可加深对MySQL innodb物理页面内部结构理解。
     \end{itemize}
 
-  \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能,非阻塞和轻量级网络框架，不使用标准golang语言net网络包, 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统)), 轻松快速搭建高性能服务器.(\url{https://github.com/zput/zput\_net\_golang})
-    \begin{itemize}[parsep=0.2ex]
+  \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能，非阻塞和轻量级网络框架，不使用标准golang语言net网络包， 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统))， 轻松快速搭建高性能服务器。(\url{https://github。com/zput/zput\_net\_golang})
+    \begin{itemize}[parsep=0。2ex]
           \item 非阻塞I/O。
           \item 多Goroutine支持，每个Goroutine运行一个事件驱动的事件循环。
           \item 读写缓冲区使用可伸缩的环形缓冲区。
@@ -59,42 +76,42 @@
           \item 支持事件定时任务。
     \end{itemize}
 
-  \item \textbf{ringbuffer}多功能环形缓存，可配置加锁（线程安全）与不加锁（性能更好），当空间满自动扩展，可预先查看缓存中的数据，探索API的方式读等.(\url{https://github.com/zput/ringbuffer})
-    \begin{itemize}[parsep=0.2ex]
+  \item \textbf{ringbuffer}多功能环形缓存，可配置加锁（线程安全）与不加锁（性能更好），当空间满自动扩展，可预先查看缓存中的数据，探索API的方式读等。(\url{https://github。com/zput/ringbuffer})
+    \begin{itemize}[parsep=0。2ex]
           \item 在New构造函数的时候，通过参数决定是加锁（线程安全）还是不加锁。
           \item 当环形缓存空间满后，可以自动扩展内存。
           \item 当使用探索类函数(ExploreBegin()----ExploreRead()/ExploreSize()----ExploreCommit()/ExploreBreak())，可以预先探索缓存中的数据，最后可以决定是提交还是放弃。
     \end{itemize}
 
-  \item \textbf{zxc\_net}zxc\_net是基于Reactor模式的多线程C++网络库.(\url{https://github.com/zput/zxc\_net})
-    \begin{itemize}[parsep=0.2ex]
-          \item 依赖于C++11提供的std::thread库,多线程表现在:
-            \begin{itemize}[parsep=0.2ex]
-              \item 为accept socket 的线程中的acceptFd 开启SO\_RESUEPORT选项，多个线程拥有自己的Acceptor进行接收客户端连接.
-              \item 为每个拥有acceptFd的线程建立了线程池, 便于分发接收到的clientFd. 解决了TCP连接负载均衡的问题, 减少客户连接等待时间.
-              \item 非阻塞的poll模式,
+  \item \textbf{zxc\_net}zxc\_net是基于Reactor模式的多线程C++网络库。(\url{https://github。com/zput/zxc\_net})
+    \begin{itemize}[parsep=0。2ex]
+          \item 依赖于C++11提供的std::thread库，多线程表现在:
+            \begin{itemize}[parsep=0。2ex]
+              \item 为accept socket 的线程中的acceptFd 开启SO\_RESUEPORT选项，多个线程拥有自己的Acceptor进行接收客户端连接。
+              \item 为每个拥有acceptFd的线程建立了线程池， 便于分发接收到的clientFd。 解决了TCP连接负载均衡的问题， 减少客户连接等待时间。
+              \item 非阻塞的poll模式，
             \end{itemize}
-          \item 拥有read/write buff缓冲区, readv + LT 触发可以读取较大数据.
+          \item 拥有read/write buff缓冲区， readv + LT 触发可以读取较大数据。
     \end{itemize}
 \end{itemize}
 
 
 \section{杂谈}
-\begin{itemize}[parsep=0.2ex]
-  \item \textbf{golang调度} \url{https://zput.github.io/categories/golang%E8%B0%83%E5%BA%A6/}
+\begin{itemize}[parsep=0。2ex]
+  \item \textbf{golang调度} \url{https://zput。github。io/categories/golang%E8%B0%83%E5%BA%A6/}
   \item \textbf{内部做的技术分享PPT}:
-  \begin{itemize}[parsep=0.2ex]
-    \item \textbf{chan}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
-    \item \textbf{goroutine}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
+  \begin{itemize}[parsep=0。2ex]
+    \item \textbf{chan}: \url{https://docs。google。com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
+    \item \textbf{goroutine}: \url{https://docs。google。com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
   \end{itemize}
 \end{itemize}
 
 \section{技能清单}
-\begin{itemize}[parsep=0.2ex]
-  \item \textbf{编程语言}: Go, C++, C, SQL, Shell
+\begin{itemize}[parsep=0。2ex]
+  \item \textbf{编程语言}: Go， C++， C， SQL， Shell
   \item \textbf{数据库相关}: MySQL/PostgreSQL/Redis/MongoDB
   \item \textbf{消息队列}: kafka
-  \item \textbf{一些工程构建}: kubernets, docker, helm, gitlab, ci/cd, beego, go-micro, grpc
+  \item \textbf{一些工程构建}: kubernets， docker， helm， gitlab， ci/cd， beego， go-micro， grpc
 \end{itemize}
 
 
@@ -103,3 +120,117 @@
 %\bibliographystyle{IEEETran}
 %\bibliography{mycite}
 \end{document}
+
+
+\begin{itemize}[parsep=0。2ex]
+  \item 开发小程序，微信公众号，淘宝内的H5架构平台。
+  \item 为商户提供公司的开放平台接口。
+  \item 为外部商家提供总店门店操作， 会员注册， 衣服商品CRUD操作， 提供与线下设备传输交流打通3D试衣等功能等开放平台的API。
+  \item 可扩展性的的小程序，H5的公共平台。
+\end{itemize}
+
+
+
+
+
+
+%Feature：是什么
+%Advantage：比别人好在哪些地方
+%Benefit：如果雇佣你，招聘方会得到什么好处
+%其次，写简历和写议论文不同，过分的论证会显得自夸，反而容易引起反感，所以要点到为止。这里的技巧是，提供论据，把论点留给阅读简历的人自己去得出。放论据要具体，最基本的是要数字化，好的论据要让人印象深刻。
+%
+%举个例子，下边内容是虚构的：
+%
+%2006年，我参与了手机XX网发布系统WAPCMS的开发（这部分是大家都会写的）。
+%作为核心程序员，我不但完成了网站界面、调度队列的开发工作，更提出了高效的组件级缓存系统，通过碎片化缓冲有效的提升了系统的渲染效率。
+%（这部分是很多同学忘掉的，要写出你在这个项目中具体负责的部分，以及你贡献出来的价值。）
+%在该系统上线后，Web前端性能从10QPS提升到200QPS，服务器由10台减少到3台（通过量化的数字来增强可信度）。
+%2008年我升任WAPCMS项目负责人，带领一个3人小组支持着每天超过2亿的PV（这就是Benefit。你能带给前雇主的价值，也就是你能带给新雇主的价值。）。
+%
+%有同学问，如果我在项目里边没有那么显赫的成绩可以说怎么办？讲不出成绩时，就讲你的成长。因为学习能力也是每家公司都看中的东西。你可以写你在这个项目里边遇到了一个什么样的问题，别人怎么解决的，你怎么解决的，你的方案好在什么地方，最终这个方案的效果如何。
+%
+%具体、量化、有说服力，是技术简历特别需要注重的地方。
+%
+%（以上内容在写完简历后，对每一段进行评估，完成后再删除）
+
+
+
+
+
+
+
+
+
+%- 企业上云：整合服务， 整理路由，上k8s。
+%当时有十几个beego独立的微服务，前端调用的相同前缀URI但不同后缀的接口，可能分布在几个微服务中，
+%无法进行负载均衡，分散流量，作为发起者，与前端商讨路由整合重构后缩减微服务到7个，并编写helm，服务都上到k8s，(\url(helm参考))
+%性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
+%  - 2019-10-24 22:03:00
+%
+%- 规划编写服务CI/CD基于gitlab自动发布k8s流程。
+%其中包括。gitlab-ci。yml的编写，gitlab-runner部署以及它默认docker等（\url(https://zput。github。io/2020/01/22/tool/gitlab/learn_gitlab/）)。
+%当自动发布上线后，开发打包部署到交给测试人员测试，从至少15分钟，降低到5分钟内。
+%  - 2020-01-22 20:09:00
+%  - 2020-02-25 21:06:00
+%
+%- 构建基于go-micro后台微服务框架
+%适应团队新的开发流程，和兼容以前的服务与小程序，对外提供了grp与grpc-gw(json)两个服务，内部模块分为API层（）， work层（），core层（），内部服务交流直接使用的go-micro自带提供的
+%参与整个框架制定，实现对外提供的两个服务（grpc，grpc-gw）与core层等，开发调研了服务周边的设施（log， token， sql driver）
+%缩短与前端对接时间，定好*。proto协议，即可分发给个模块人员。
+%
+%  - 2020-04-25 22:16:00
+%- 参与公司两条新产品AI线，语文课的开发，
+%领导参与的主要模块包括登录相关，权限相关
+%课程，题库，学生排课，作业，公众号提醒与消息推送等
+%学生人数从0到1。5万人数增长。
+%现在为这两条线的后台项目负责人，开发新需求与维护线上服务稳定。
+%  - 2020-08-15 20:16:00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%token --> rbac --> grpcgw
+%- kubernets log/monitory
+%//- logrus
+%- https://github。com/lib/pq
+%- 构建基于go-micro后台微服务框架
+%  - blog
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
