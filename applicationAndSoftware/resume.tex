@@ -16,7 +16,7 @@
 
 % {E-mail}{mobilephone}{homepage}
 % be careful of _ in emaill address
-\contactInfo{(+86) 177-1164-4027}{ffzxc。do@gmail。com}{GitHub @zput}{}
+\contactInfo{(+86) 177-1164-4027}{ffzxc.do@gmail.com}{GitHub @zput}{}
 % {E-mail}{mobilephone}
 % keep the last empty braces!
 %\contactInfo{xxx@yuanbin。me}{(+86) 131-221-87xxx}{}
@@ -24,30 +24,35 @@
 \section{个人信息}
 \begin{itemize}[parsep=0.2ex]
   \item 赵轩超/男/1993-12
-  \item 本科/湖南理工学院/自动化(2012。09-2016。06)
+  \item 本科/湖南理工学院/自动化(2012.09-2016.06)
   \item 技术博客:zput.github.io
   \item Github:http://github.zput
 \end{itemize}
 
 \section{工作经历}
 
-\datedsubsection{\textbf{深圳九维智慧科技有限 公司}， 平台架构部golang开发工程师}{2019。7-至今}
+\datedsubsection{\textbf{深圳乐天童创科技有限公司}， 平台架构部golang开发工程师}{2019.7-至今}
 \begin{itemize}[parsep=0.2ex]
-   \item 企业上云，整合服务，整理路由，上k8s。当时有十几个beego独立的微服务，前端调用的相同前缀URI但不同后缀的接口，可能分布在几个微服务中，无法进行负载均衡，分散流量，作为发起者，与前端商讨路由整合重构后缩减微服务到7个，并编写helm，服务都上到k8s，(\url(helm参考))。性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
-      %  - 2019-10-24 22:03:00
+   \item 企业上云，整合服务，整理路由，上k8s。当时有十几个beego独立的微服务，前端调用的相同前缀URI但不同后缀的接口，可能分布在几个微服务中，无法进行负载均衡，分散流量，作为发起者，与前端商讨路由整合重构后缩减微服务到7个，并编写helm，服务都上到k8s。性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
+      %(\url(helm参考)
+      % - 2019-10-24 22:03:00
 
-   \item 规划编写服务CI/CD基于gitlab自动发布k8s流程。其中包括。gitlab-ci。yml的编写，gitlab-runner部署以及它默认docker等（一些总结 \url{https://zput.githut.io/2020/01/22/tool/gitlab/conclusion_gitlab_ci_cd/}和\url{https://zput.github.io/2020/01/22/tool/gitlab/the_process_structure_ci_cd_base_on_gitlab/})。当自动发布上线后，开发打包部署到交给测试人员测试，从至少15分钟，降低到5分钟内。
+   \item 规划编写服务CI/CD基于gitlab自动发布k8s流程。其中包括。gitlab-ci.yml的编写，gitlab-runner部署以及它默认docker等。当自动发布上线后，开发打包部署到交给测试人员测试，从至少15分钟，降低到5分钟内。
+    \begin{itemize}[parsep=0.1ex]
+      \item \url{https://zput.github.io/2020/02/25/tool/gitlab/conclusion_gitlab_ci_cd/}
+      \item \url{https://zput.github.io/2020/01/22/tool/gitlab/the_process_structure_ci_cd_base_on_gitlab/})
+    \end{itemize}
       %  - 2020-01-22 20:09:00
       %  - 2020-02-25 21:06:00
 
    \item 构建基于go-micro后台微服务框架。为适应团队新的开发流程，和兼容以前的服务与小程序，对外提供了grp与grpc-gw(json)两个服务，内部模块分为API层（）， work层（），core层（），内部服务交流直接使用的go-micro自带提供的。参与整个框架制定，实现对外提供的两个服务（grpc，grpc-gw）与core层等，开发调研了服务周边的设施（log， token， sql driver）， 缩短与前端对接时间，定好*。proto协议，即可分发给个模块人员。
       %  - 2020-04-25 22:16:00
 
-   \item  参与公司两条新产品AI线，语文课的开发。领导参与的主要模块包括登录相关，权限相关， 课程，题库，学生排课，作业，公众号提醒与消息推送等， 学生人数从0到1。5万人数增长。现在为这两条线的后台项目负责人，开发新需求与维护线上服务稳定。
+   \item  参与公司两条新产品AI线，语文课的开发。领导参与的主要模块包括登录相关，权限相关， 课程，题库，学生排课，作业，公众号提醒与消息推送等， 学生人数从0到1.5万人数增长。现在为这两条线的后台项目负责人，开发新需求与维护线上服务稳定。
       %  - 2020-08-15 20:16:00
 \end{itemize}
 
-\datedsubsection{\textbf{深圳云之梦科技有限公司}， 平台架构部golang开发工程师}{2018。9-2019。7}
+\datedsubsection{\textbf{深圳云之梦科技有限公司}， 平台架构部golang开发工程师}{2018.9-2019.7}
 \begin{itemize}[parsep=0.2ex]
   \item 开发小程序，微信公众号，淘宝内的H5架构平台。
   \item 为商户提供公司的开放平台接口。
@@ -55,7 +60,7 @@
   \item 可扩展性的的小程序，H5的公共平台。
 \end{itemize}
 
-\datedsubsection{\textbf{深圳优科数字化制造有限公司}， 研发工程师}{2016。6-2018。9}
+\datedsubsection{\textbf{深圳优科数字化制造有限公司}， 研发工程师}{2016.6-2018.9}
 \begin{itemize}[parsep=0.2ex]
   \item 与前端或微信小程序连接的多线程后端C++开发， 工业软件的数据通信的开发， 与AGV等智能设备数据连接的开发。
 \end{itemize}
@@ -64,7 +69,7 @@
 \begin{itemize}[parsep=0.2ex]
   \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件。(\url{https://github.com/zput/innodb\_view})
     \begin{itemize}[parsep=0.2ex]
-        \item Innodb_view是一个直接访问MySQL InnoDB存储引擎文件的Golang实现。通过命令行可以遍历所有已经使用的页，分析每个页的类型; 分析Inode page页面组成;Index page页面的组成等。此外，这个项目可加深对MySQL innodb物理页面内部结构理解。
+        \item Innodb\_view是一个直接访问MySQL InnoDB存储引擎文件的Golang实现。通过命令行可以遍历所有已经使用的页，分析每个页的类型; 分析Inode page页面组成;Index page页面的组成等。此外，这个项目可加深对MySQL innodb物理页面内部结构理解。
     \end{itemize}
 
   \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能，非阻塞和轻量级网络框架，不使用标准golang语言net网络包， 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统))， 轻松快速搭建高性能服务器。(\url{https://github.com/zput/zput\_net\_golang})
