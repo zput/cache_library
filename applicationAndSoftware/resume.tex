@@ -22,7 +22,7 @@
 %\contactInfo{xxx@yuanbin。me}{(+86) 131-221-87xxx}{}
  
 \section{个人信息}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item 赵轩超/男/1993-12
   \item 本科/湖南理工学院/自动化(2012。09-2016。06)
   \item 技术博客:zput.github.io
@@ -32,7 +32,7 @@
 \section{工作经历}
 
 \datedsubsection{\textbf{深圳九维智慧科技有限 公司}， 平台架构部golang开发工程师}{2019。7-至今}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
    \item 企业上云，整合服务，整理路由，上k8s。当时有十几个beego独立的微服务，前端调用的相同前缀URI但不同后缀的接口，可能分布在几个微服务中，无法进行负载均衡，分散流量，作为发起者，与前端商讨路由整合重构后缩减微服务到7个，并编写helm，服务都上到k8s，(\url(helm参考))。性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
       %  - 2019-10-24 22:03:00
 
@@ -48,7 +48,7 @@
 \end{itemize}
 
 \datedsubsection{\textbf{深圳云之梦科技有限公司}， 平台架构部golang开发工程师}{2018。9-2019。7}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item 开发小程序，微信公众号，淘宝内的H5架构平台。
   \item 为商户提供公司的开放平台接口。
   \item 为外部商家提供总店门店操作， 会员注册， 衣服商品CRUD操作， 提供与线下设备传输交流打通3D试衣等功能等开放平台的API。
@@ -56,19 +56,19 @@
 \end{itemize}
 
 \datedsubsection{\textbf{深圳优科数字化制造有限公司}， 研发工程师}{2016。6-2018。9}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item 与前端或微信小程序连接的多线程后端C++开发， 工业软件的数据通信的开发， 与AGV等智能设备数据连接的开发。
 \end{itemize}
 
 \section{一些开源项目}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件。(\url{https://github.com/zput/innodb\_view})
-    \begin{itemize}[parsep=0。2ex]
+    \begin{itemize}[parsep=0.2ex]
         \item Innodb_view是一个直接访问MySQL InnoDB存储引擎文件的Golang实现。通过命令行可以遍历所有已经使用的页，分析每个页的类型; 分析Inode page页面组成;Index page页面的组成等。此外，这个项目可加深对MySQL innodb物理页面内部结构理解。
     \end{itemize}
 
   \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能，非阻塞和轻量级网络框架，不使用标准golang语言net网络包， 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统))， 轻松快速搭建高性能服务器。(\url{https://github.com/zput/zput\_net\_golang})
-    \begin{itemize}[parsep=0。2ex]
+    \begin{itemize}[parsep=0.2ex]
           \item 非阻塞I/O。
           \item 多Goroutine支持，每个Goroutine运行一个事件驱动的事件循环。
           \item 读写缓冲区使用可伸缩的环形缓冲区。
@@ -77,16 +77,16 @@
     \end{itemize}
 
   \item \textbf{ringbuffer}多功能环形缓存，可配置加锁（线程安全）与不加锁（性能更好），当空间满自动扩展，可预先查看缓存中的数据，探索API的方式读等。(\url{https://github.com/zput/ringbuffer})
-    \begin{itemize}[parsep=0。2ex]
+    \begin{itemize}[parsep=0.2ex]
           \item 在New构造函数的时候，通过参数决定是加锁（线程安全）还是不加锁。
           \item 当环形缓存空间满后，可以自动扩展内存。
           \item 当使用探索类函数(ExploreBegin()----ExploreRead()/ExploreSize()----ExploreCommit()/ExploreBreak())，可以预先探索缓存中的数据，最后可以决定是提交还是放弃。
     \end{itemize}
 
   \item \textbf{zxc\_net}zxc\_net是基于Reactor模式的多线程C++网络库。(\url{https://github.com/zput/zxc\_net})
-    \begin{itemize}[parsep=0。2ex]
+    \begin{itemize}[parsep=0.2ex]
           \item 依赖于C++11提供的std::thread库，多线程表现在:
-            \begin{itemize}[parsep=0。2ex]
+            \begin{itemize}[parsep=0.2ex]
               \item 为accept socket 的线程中的acceptFd 开启SO\_RESUEPORT选项，多个线程拥有自己的Acceptor进行接收客户端连接。
               \item 为每个拥有acceptFd的线程建立了线程池， 便于分发接收到的clientFd。 解决了TCP连接负载均衡的问题， 减少客户连接等待时间。
               \item 非阻塞的poll模式，
@@ -97,17 +97,17 @@
 
 
 \section{杂谈}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item \textbf{golang调度} \url{https://zput.github.io/categories/golang%E8%B0%83%E5%BA%A6/}
   \item \textbf{内部做的技术分享PPT}:
-  \begin{itemize}[parsep=0。2ex]
+  \begin{itemize}[parsep=0.2ex]
     \item \textbf{chan}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
     \item \textbf{goroutine}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
   \end{itemize}
 \end{itemize}
 
 \section{技能清单}
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item \textbf{编程语言}: Go， C++， C， SQL， Shell
   \item \textbf{数据库相关}: MySQL/PostgreSQL/Redis/MongoDB
   \item \textbf{消息队列}: kafka
@@ -122,7 +122,7 @@
 \end{document}
 
 
-\begin{itemize}[parsep=0。2ex]
+\begin{itemize}[parsep=0.2ex]
   \item 开发小程序，微信公众号，淘宝内的H5架构平台。
   \item 为商户提供公司的开放平台接口。
   \item 为外部商家提供总店门店操作， 会员注册， 衣服商品CRUD操作， 提供与线下设备传输交流打通3D试衣等功能等开放平台的API。
