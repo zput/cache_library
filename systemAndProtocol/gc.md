@@ -59,11 +59,16 @@ how:
 
 
 
+## 扩展
+
+### mutator?
+
 “同GC并发执行的用户程序，源码与GC相关书籍中都称其为“mutator”（赋值器）”
 
+### FQA
 
+#### 谈一谈golang的gc.
 
-- QA:谈一谈golang的gc.
 - 一：Golang中GC的实现采用的是标记——清扫算法，支持增量与并发式回收。
    - 标记清除，不是像原始的，STW（stop the world）, 一个是暂停的时间太长，二个是用户的程序需暂停。它采用的是基于三色标记的混合写屏障。
    - 增量和并发，一个是横向一个是纵向，gc与mutator交替与运行。所以这里也需要屏障技术。
@@ -80,51 +85,116 @@ how:
 ![gc](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113105703.png)
 
 
-- 二：为什么清扫阶段不需要屏障了呢？
-        - 当标记完成了，那么它白色的对象都是不可达的对象，是可以删除的对象，程序不可能再找到已经不可达的对象。所以放心的清除。
+#### 二：为什么清扫阶段不需要屏障了呢？
 
-- 三：golang的heap结构
-    - ![20210113134838](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113134838.png)
+   - 当标记完成了，那么它白色的对象都是不可达的对象，是可以删除的对象，程序不可能再找到已经不可达的对象。所以放心的清除。
 
+#### 三：golang的heap结构
+  - ![20210113134838](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113134838.png)
+  - 参见下面的内存分配器
     - 03. Golang中GC的三色标记
-        -（1）着为灰色对应的操作就是把指针对应的gcmarkBits标记位置为1并**加入工作队列**；
-        -（2）着为黑色对应的操作就是把指针对应的gcmarkBits标记位置为1。
-        -（3）白色对象就是那些gcMarkBits中标记为0的对象。
+        -（1）着为灰色对应的操作就是把指针对应的```gcmarkBits```标记位置为1并**加入工作队列**；
+        -（2）着为黑色对应的操作就是把指针对应的```gcmarkBits```标记位置为```1```。
+        -（3）白色对象就是那些```gcMarkBits```中标记为0的对象。
+
+知道标记在哪了，那么如果进行分工？
+#### 四: **工作队列**相关的问题：并发标记的分工问题？写屏障记录集的竞争问题？
+
+   - 前面提到了全局变量work中存储着全局工作队列缓存（work.full），其实每个P都有一个本地工作队列（p.gcw）和一个写屏障缓冲（p.wbBuf）。
+   - p.gcw中有两个workbuf：wbuf1和wbuf2，添加任务时总是从wbuf1添加，wbuf1满了就交换wbuf1和wbuf2，如果还是满的，就把当前wbuf1的工作flush到全局工作缓存中去。
+
+知道分工了，不可能占用很多CPU进行gc,这样会限制用户程序。
+#### 五： CUP utilization
+
+   - GC默认的CPU目标使用率为25%，在GC执行的初始化阶段，会根据当前CPU核数乘以CPU目标使用率来计算需要启动的```mark worker```数量。
+   - ![20210113134856](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113134856.png)
 
 
-问题**工作队列**相关的问题：并发标记的分工问题？写屏障记录集的竞争问题？
-    - 前面提到了全局变量work中存储着全局工作队列缓存（work.full），其实每个P都有一个本地工作队列（p.gcw）和一个写屏障缓冲（p.wbBuf）。
-    - p.gcw中有两个workbuf：wbuf1和wbuf2，添加任务时总是从wbuf1添加，wbuf1满了就交换wbuf1和wbuf2，如果还是满的，就把当前wbuf1的工作flush到全局工作缓存中去。
-
-
-- 四： CUP utilization
-    - GC默认的CPU目标使用率为25%，在GC执行的初始化阶段，会根据当前CPU核数乘以CPU目标使用率来计算需要启动的```mark worker```数量。
-    - ![20210113134856](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113134856.png)
-
-问题04.
-并发GC如何缓解内存分配压力？
-
-
-
-
-
-
+#### TODO: 并发GC如何缓解内存分配压力？
+    - 借贷偿还机制。也可以偷。
 
 
 
+### 内存分配器
+
+```go
+//go:notinheap
+type mheap struct {
+//...    
+	// arenas is the heap arena map. It points to the metadata for
+	// the heap for every arena frame of the entire usable virtual
+	// address space.
+	//
+	// Use arenaIndex to compute indexes into this array.
+	//
+	// For regions of the address space that are not backed by the
+	// Go heap, the arena map contains nil.
+	//
+	// Modifications are protected by mheap_.lock. Reads can be
+	// performed without locking; however, a given entry can
+	// transition from nil to non-nil at any time when the lock
+	// isn't held. (Entries never transitions back to nil.)
+	//
+	// In general, this is a two-level mapping consisting of an L1
+	// map and possibly many L2 maps. This saves space when there
+	// are a huge number of arena frames. However, on many
+	// platforms (even 64-bit), arenaL1Bits is 0, making this
+	// effectively a single-level map. In this case, arenas[0]
+	// will never be nil.
+	arenas [1 << arenaL1Bits]*[1 << arenaL2Bits]*heapArena
+//...
+}
+
+//A heapArena stores metadata for a heap arena.
+// 每一个heapArena管理一个heap arena.
+type heapArena struct {
+	bitmap [heapArenaBitmapBytes]byte
+	spans [pagesPerArena]*mspan
+	pageInUse [pagesPerArena / 8]uint8
+	pageMarks [pagesPerArena / 8]uint8
+	zeroedBase uintptr
+}
+
+type mspan struct {
+    next *mspan
+	prev *mspan
+	//...
+
+	startAddr uintptr // 起始地址
+	npages    uintptr // 页数
+	freeindex uintptr
+
+	allocBits  *gcBits
+	gcmarkBits *gcBits
+    allocCache uint64
+
+    //startAddr 和 npages — 确定该结构体管理的多个页所在的内存，每个页的大小都是 8KB；
+    //freeindex — 扫描页中空闲对象的初始索引；
+    //allocBits 和 gcmarkBits — 分别用于标记内存的占用和回收情况；
+    //allocCache — allocBits 的补码，可以用于快速查找内存中未被使用的内存；
+
+	//...
+}
+```
+[mheap](https://github.com/golang/go/blob/e7f9e17b7927cad7a93c5785e864799e8d9b4381/src/runtime/mheap.go#L152)
+
+[heapArena](https://github.com/golang/go/blob/e7f9e17b7927cad7a93c5785e864799e8d9b4381/src/runtime/mheap.go#L217)
 
 
+- mheap中每个arena对应一个HeapArena，记录arena的元数据信息。HeapArena中有一个bitmap和一个spans字段。
+    -（1）bitmap
+        - bitmap中每两个bit对应标记arena中一个指针大小的word，也就是说bitmap中一个byte可以标记arena中连续四个指针大小的内存。
+        - 每个word对应的两个bit中，**低位bit用于标记是否为指针**，0为非指针，1为指针；**高位bit用于标记是否要继续扫描**，高位bit为1就代表扫描完当前word并不能完成当前数据对象的扫描。
+    -（2）spans
+        - spans是一个*mspan类型的数组，用于记录当前arena中每一页对应到哪一个mspan。
 
+基于HeapArena记录的元数据信息，我们只要知道一个对象的地址，就可以根据HeapArena.bitmap信息扫描它内部是否含有指针；也可以根据对象地址计算出它在哪一页，然后通过HeapArena.spans信息查到该对象存在哪一个mspan中。
 
-
-
-
-
-
-
-
-
-
+- 而每个span都对应两个位图标记：mspan.allocBits和mspan.gcmarkBits。
+    - （1）allocBits中每一位用于标记一个对象存储单元是否已分配。
+      - ![20210113202836](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202836.png)
+    - （2）```gcmarkBits```中每一位用于标记**一个对象是否存活**。
+      - ![20210113202858](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202858.png)  
 
 
 
