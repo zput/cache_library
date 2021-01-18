@@ -111,7 +111,7 @@ how:
 
 
 #### TODO: 并发GC如何缓解内存分配压力？
-    - 借贷偿还机制。也可以偷。
+    - 借贷偿还机制。也可以偷![20210118202539](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202539.png)。
 
 
 

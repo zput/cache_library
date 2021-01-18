@@ -7,9 +7,9 @@
 
 - 跟类型相关：
 	- 类型系统
-	- 跟函数定义的结构相关(func val)
+	- 跟函数定义的结构相关(function value)
 		- 函数调用栈细节
-		- 函数与闭包
+		- 闭包
 		- 方法(method):method expression/method value
 		- defer三阶段
 		- panic AND recover
@@ -30,22 +30,182 @@
 		- 内存分配
 
 
+### 类型系统
+
+```go
+type mType struct{
+	x int64
+}
+func (mType) Method(){
+}
+var mObject mType
+```
+
+- 我们知道mObject内存布局代表的是一块内存,有8个字节，那么mObject怎么调用```mObject.Method()```?
+  - ```mObject.Method()``` ---> ```Method(mObject)```调用方法，就是调用函数，对象自己当作第一个参数,但是这仅仅是在编译阶段，编译器可以进行转换，
+  - 但是为了支持在运行阶段的语言特性，比如反射，接口动态派发、类型断言,所以编译器会给每种类型生成对应的类型描述信息写入可执行文件，这些类型描述信息就是**类型元数据**,方便在运行时操作.
+
+
+```go
+type myslice []string
+
+func (ms myslice) Len(){
+	fmt.Println(len(ms))
+}
+
+func (ms myslice) Cap(){
+	fmt.Println(cap(ms))
+}
+```
+
+![20210118195910](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118195910.png)
+
+
+
+```go
+type slicetype struct {
+	typ  _type
+	elem *_type
+}
+```
+[type slicetype struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L416)
+  - 其中```_type```[type _type struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L31)
+  - 其中```uncommontype```[type uncommontype struct {](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L353)
+
+![类型总结](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118183705.png)
+
+
+
+### 跟函数定义的结构相关
+
+- ```Function Value```本质上是一个指针，却不直接指向函数指令入口，而是指向```runtime.funcval结构体```。
+
+```go
+type funcval struct {
+    fn uintptr
+}
+```
+
+![20210118201453](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118201453.png)
+
+[【Golang】图解Function value](https://mp.weixin.qq.com/s/iFYkcLbNK5pOA37N7ToJ5Q)
+
+#### 函数调用栈细节
+
+![20210118203758](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203758.png)
+
+
+![20210118203013](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203013.png)
+
+- 为什么被调用函数, 改变不了caller的传给callee的参数?
+
+![20210118203111](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203111.png)
+
+
+- 如果一个函数调用几个函数,且他们的形参个数不一, 大小不一, 那么这个caller的栈大小,是:
+自己的参数+最大参数字节和的callee的值.
+![20210118203215](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203215.png)
+
+
+#### 闭包
+
+![20210118202701](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202701.png)
+
+
+![20210118202810](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202810.png)
+
+#### 方法(method)
 
 
 
 
-- 数据结构
+#### defer三阶段
 
-- 常用关键字
-  - for 和 range
-  - select
-  - defer
-  - panic 和 recover
-  - make 和 new
+只要懂得```defer```函数其实会被编译器编译成```deferproc function```。
+##### before 1.13
 
-- 并发编程
+![20210118204052](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204052.png)
 
-- 内存
+![20210118204243](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204243.png)
+
+![20210118204350](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204350.png)
+##### 1.13
+
+
+![20210118205046](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205046.png)
+
+##### 1.14
+
+![20210118205208](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205208.png)
+
+- 思考为什么不支持循环defer?
+
+![20210118205340](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205340.png)
+
+
+![20210118205418](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205418.png)
+
+#### panic AND recover
+
+
+
+
+
+
+### 跟interface相关
+
+```go
+type interfacetype struct {
+	typ     _type
+	pkgpath name
+	mhdr    []imethod
+}
+```
+[type interfacetype struct {](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L366)
+
+#### 接口
+
+![20210118205914](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205914.png)
+
+#### 类型断言
+
+
+
+#### reflect
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### 0.方法
 
@@ -478,6 +638,21 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 
 
 
+
+## archive
+
+- 数据结构
+
+- 常用关键字
+  - for 和 range
+  - select
+  - defer
+  - panic 和 recover
+  - make 和 new
+
+- 并发编程
+
+- 内存
 
 
 
