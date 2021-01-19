@@ -30,6 +30,7 @@
 		- 内存分配
 
 
+## 跟类型相关
 ### 类型系统
 
 ```go
@@ -78,7 +79,7 @@ type slicetype struct {
 
 ### 跟函数定义的结构相关
 
-- ```Function Value```本质上是一个指针，却不直接指向函数指令入口，而是指向```runtime.funcval结构体```。
+- ```Function Value```本质上是一个指针，却不直接指向函数指令入口，而是指向```runtime.funcval结构体```,然后再由这个结构体来指向函数指令入口。
 
 ```go
 type funcval struct {
@@ -93,6 +94,7 @@ type funcval struct {
 #### 函数调用栈细节
 
 ![20210118203758](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203758.png)
+
 
 
 ![20210118203013](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203013.png)
@@ -131,8 +133,34 @@ type funcval struct {
 ![20210118204350](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204350.png)
 ##### 1.13
 
-
 ![20210118205046](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205046.png)
+
+```go
+package main
+
+import "testing"
+
+func BenchmarkDefer(b *testing.B){
+	for i:=0; i< b.N; i++{
+		Defer(i)
+	}
+}
+
+func Defer(i int)(r int){
+	defer func(){
+		r -= 1
+		r |= r>>1
+		r |= r>>2
+		r |= r>>4
+		r |= r>>8
+		r |= r>>16
+		r |= r>>32
+		r += 1
+	}()
+	r = i*i
+	return
+}
+```
 
 ##### 1.14
 
@@ -165,15 +193,89 @@ type interfacetype struct {
 
 #### 接口
 
+```
+eface
+iface
+	interfacetype
+```	
+
 ![20210118205914](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205914.png)
+![20210119141924](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119141924.png)
+![20210119142057](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119142057.png)
 
 #### 类型断言
+
 
 
 
 #### reflect
 
 
+##### reflect.Type
+
+![20210119152902](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119152902.png)
+
+- 因为reflect.Type也是一个非空接口类型, 它有许多方法.所以使用上节所用的非空接口类型。
+
+
+##### reflect.Value
+
+
+```go
+type Value struct {
+	// typ holds the type of the value represented by a Value.
+	typ *rtype
+	ptr unsafe.Pointer
+	// The lowest bits are flag bits:
+	//	- flagStickyRO: obtained via unexported not embedded field, so read-only
+	//	- flagEmbedRO: obtained via unexported embedded field, so read-only
+	//	- flagIndir: val holds a pointer to the data
+	//	- flagAddr: v.CanAddr is true (implies flagIndir)
+	//	- flagMethod: v is a method value.
+	flag
+}
+```
+[flagIndir的解释](https://github.com/golang/go/blob/f0ff6d4a67ec9a956aa655d487543da034cf576b/src/reflect/value.go#L49)
+
+注意点：```rtype```这个结构体与 ```../runtime/type.go:/^type._type```是要保持一致的(一一对应)。
+
+
+![20210119152952](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119152952.png)
+
+
+继续来看下这个```unpackEface```
+
+```go
+// unpackEface converts the empty interface i to a Value.
+func unpackEface(i interface{}) Value {
+	e := (*emptyInterface)(unsafe.Pointer(&i))
+	// NOTE: don't read e.word until we know whether it is really a pointer or not.
+	t := e.typ
+	if t == nil {
+		return Value{}
+	}
+	// 下面的这些主要是构建一个Value结构体中的一个字段flag
+	f := flag(t.Kind())// 这里t.Kind()就是rtype或者说_type中的kind字段
+	if ifaceIndir(t) {
+		f |= flagIndir
+	}
+	return Value{t, e.word, f}
+}
+
+func (t *rtype) Kind() Kind { return Kind(t.kind & kindMask) }
+const kindMask        = (1 << 5) - 1
+//取最后的五个bits。
+//最终再强制转为flag类型---》 rtype使用Kind方法可以得到实际的Kind值
+//我们看下flag得到Kind值
+func (f flag) kind() Kind {
+	return Kind(f & flagKindMask)
+}
+const 	flagKindMask    flag = 1<<flagKindWidth - 
+//是一模一样的。
+
+```
+
+![20210119185041](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119185041.png)
 
 
 
@@ -197,15 +299,11 @@ type interfacetype struct {
 
 
 
-
-
-
-
-
-
-
-
-
+```
+// --------------------------
+// --------------------------
+// --------------------------
+```
 
 ### 0.方法
 
@@ -653,22 +751,6 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 - 并发编程
 
 - 内存
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
