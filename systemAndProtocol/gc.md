@@ -69,12 +69,12 @@ how:
 
 #### 谈一谈golang的gc.
 
-- 一：Golang中GC的实现采用的是标记——清扫算法，支持增量与并发式回收。
+- 一：Golang中GC的实现采用的是标记——清扫算法，支持增量与并发式回收。非完全并发操作
    - 标记清除，不是像原始的，STW（stop the world）, 一个是暂停的时间太长，二个是用户的程序需暂停。它采用的是基于三色标记的混合写屏障。
    - 增量和并发，一个是横向一个是纵向，gc与mutator交替与运行。所以这里也需要屏障技术。
-    - 横向：增量垃圾收集 — 增量地标记和清除垃圾，降低应用程序暂停的最长时间；
-    - 纵向：并发垃圾收集 — 利用多核的计算资源，在用户程序执行时并发标记和清除垃圾；
-        - 因为增量和并发两种方式都可以与用户程序交替运行，所以我们需要使用屏障技术保证垃圾收集的正确性.
+     - 横向：增量垃圾收集 — 增量地标记和清除垃圾，降低应用程序暂停的最长时间；
+     - 纵向：并发垃圾收集 — 利用多核的计算资源，在用户程序执行时并发标记和清除垃圾；
+       - 因为增量和并发两种方式都可以与用户程序交替运行，所以我们需要使用屏障技术保证垃圾收集的正确性.
 
 - 使用混合写屏障的原因是缩短gc暂停的时间。
   - 因为栈上使用写屏障，会导致耗时太多。但是如果栈上不使用写屏障，等到第二次STW重新扫描栈空间，goroutine数目多，需要扫描的stack耗时也多。
@@ -114,6 +114,7 @@ how:
     - 借贷偿还机制。也可以偷![20210118202539](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202539.png)。
 
 
+## 附录
 
 ### 内存分配器
 
@@ -155,46 +156,79 @@ type heapArena struct {
 	zeroedBase uintptr
 }
 
-type mspan struct {
-    next *mspan
-	prev *mspan
-	//...
+	type mspan struct {
+		next *mspan
+		prev *mspan
+		//...
 
-	startAddr uintptr // 起始地址
-	npages    uintptr // 页数
-	freeindex uintptr
+		startAddr uintptr // 起始地址
+		npages    uintptr // 页数
+		freeindex uintptr
 
-	allocBits  *gcBits
-	gcmarkBits *gcBits
-    allocCache uint64
+		allocBits  *gcBits
+		gcmarkBits *gcBits
+		allocCache uint64
 
-    //startAddr 和 npages — 确定该结构体管理的多个页所在的内存，每个页的大小都是 8KB；
-    //freeindex — 扫描页中空闲对象的初始索引；
-    //allocBits 和 gcmarkBits — 分别用于标记内存的占用和回收情况；
-    //allocCache — allocBits 的补码，可以用于快速查找内存中未被使用的内存；
+	    //startAddr 和 npages — 确定该结构体管理的多个页所在的内存，每个页的大小都是 8KB；
+	    //freeindex — 扫描页中空闲对象的初始索引；
+	    //allocBits 和 gcmarkBits — 分别用于标记内存的占用和回收情况；
+	    //allocCache — allocBits 的补码，可以用于快速查找内存中未被使用的内存；
 
-	//...
-}
+		//...
+	}
 ```
 [mheap](https://github.com/golang/go/blob/e7f9e17b7927cad7a93c5785e864799e8d9b4381/src/runtime/mheap.go#L152)
 
 [heapArena](https://github.com/golang/go/blob/e7f9e17b7927cad7a93c5785e864799e8d9b4381/src/runtime/mheap.go#L217)
 
-
-- mheap中每个arena对应一个HeapArena，记录arena的元数据信息。HeapArena中有一个bitmap和一个spans字段。
-    -（1）bitmap
-        - bitmap中每两个bit对应标记arena中一个指针大小的word，也就是说bitmap中一个byte可以标记arena中连续四个指针大小的内存。
-        - 每个word对应的两个bit中，**低位bit用于标记是否为指针**，0为非指针，1为指针；**高位bit用于标记是否要继续扫描**，高位bit为1就代表扫描完当前word并不能完成当前数据对象的扫描。
-    -（2）spans
-        - spans是一个*mspan类型的数组，用于记录当前arena中每一页对应到哪一个mspan。
+![20210120104547](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210120104547.png)
+- mheap中每个arena对应一个HeapArena，记录arena的元数据信息。HeapArena中有一个**bitmap和一个spans**字段。
+  - 1.bitmap
+    - bitmap中每两个bit对应标记arena中一个指针大小的word，也就是说bitmap中**一个byte**可以标记**arena中连续四个指针大小**的内存。
+      - 每个word对应的两个bit中，**低位bit用于标记是否为指针**，0为非指针，1为指针；**高位bit用于标记是否要继续扫描**，```高位bit为1```就代表扫描完当前word并不能完成当前数据对象的扫描。
+  - 2.spans
+    - spans是一个*mspan类型的数组，用于记录当前arena中每一页对应到哪一个mspan。(看这个mspan的结构可以知道，它有startAddr与npages,说明一个mspan管理多个page)
 
 基于HeapArena记录的元数据信息，我们只要知道一个对象的地址，就可以根据HeapArena.bitmap信息扫描它内部是否含有指针；也可以根据对象地址计算出它在哪一页，然后通过HeapArena.spans信息查到该对象存在哪一个mspan中。
 
 - 而每个span都对应两个位图标记：mspan.allocBits和mspan.gcmarkBits。
-    - （1）allocBits中每一位用于标记一个对象存储单元是否已分配。
-      - ![20210113202836](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202836.png)
-    - （2）```gcmarkBits```中每一位用于标记**一个对象是否存活**。
-      - ![20210113202858](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202858.png)  
+  - （1）allocBits中每一位用于标记一个对象存储单元是否已分配。
+    - ![20210113202836](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202836.png)
+  - （2）```gcmarkBits```中每一位用于标记**一个对象是否存活**。
+    - ![20210113202858](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202858.png)  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
