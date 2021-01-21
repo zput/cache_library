@@ -100,8 +100,14 @@ how:
 知道标记在哪了，那么如果进行分工？
 #### 四: **工作队列**相关的问题：并发标记的分工问题？写屏障记录集的竞争问题？
 
-   - 前面提到了全局变量work中存储着全局工作队列缓存（work.full），其实每个P都有一个本地工作队列（p.gcw）和一个写屏障缓冲（p.wbBuf）。
-   - p.gcw中有两个workbuf：wbuf1和wbuf2，添加任务时总是从wbuf1添加，wbuf1满了就交换wbuf1和wbuf2，如果还是满的，就把当前wbuf1的工作flush到全局工作缓存中去。
+![20210121134453](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210121134453.png)
+
+>这里的竞争问题，我怀疑是： 一个是gc从root Object到一直遍历，打标记(从上到下)，同时另一个用户程序也在更新Object的关联（比如从从一个灰色到白色节点断开）
+  >>其中用户程序的写到每个P中的写屏障缓冲区。
+
+- 前面提到了全局变量work中存储着全局工作队列缓存（work.full），其实每个P都有**一个本地工作队列（p.gcw）和一个写屏障缓冲（p.wbBuf）**。
+- p.gcw中有两个workbuf：wbuf1和wbuf2，添加任务时总是从wbuf1添加，wbuf1满了就交换wbuf1和wbuf2，如果还是满的，就把当前wbuf1的工作flush到全局工作缓存中去。
+
 
 知道分工了，不可能占用很多CPU进行gc,这样会限制用户程序。
 #### 五： CUP utilization
