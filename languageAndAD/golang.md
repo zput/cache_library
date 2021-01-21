@@ -30,6 +30,31 @@
 		- 内存分配
 
 
+## 数据结构
+
+### string
+
+### slice和数组的异同
+
+### map
+
+### struct和内存对齐
+
+- test
+
+```go
+type T1 struct {
+	f1 int8  // 1 byte
+	f2 int64 // 8 bytes
+	f3 int32 // 4 bytes
+}
+```
+
+[testMe](https://goplay.tools/snippet/6kzzmHddQgc)
+
+- 24 byte
+
+
 ## 跟类型相关
 ### 类型系统
 
