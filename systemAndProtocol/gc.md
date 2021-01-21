@@ -111,12 +111,14 @@ how:
 
 
 #### TODO: 并发GC如何缓解内存分配压力？
-    - 借贷偿还机制。也可以偷![20210118202539](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202539.png)。
+  - 借贷偿还机制。也可以偷。
 
 
 ## 附录
 
 ### 内存分配器
+
+![gc_heap](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/gc_heap.png)
 
 ```go
 //go:notinheap
@@ -181,6 +183,8 @@ type heapArena struct {
 
 [heapArena](https://github.com/golang/go/blob/e7f9e17b7927cad7a93c5785e864799e8d9b4381/src/runtime/mheap.go#L217)
 
+#### heapArena
+
 ![20210120104547](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210120104547.png)
 - mheap中每个arena对应一个HeapArena，记录arena的元数据信息。HeapArena中有一个**bitmap和一个spans**字段。
   - 1.bitmap
@@ -189,7 +193,12 @@ type heapArena struct {
   - 2.spans
     - spans是一个*mspan类型的数组，用于记录当前arena中每一页对应到哪一个mspan。(看这个mspan的结构可以知道，它有startAddr与npages,说明一个mspan管理多个page)
 
-基于HeapArena记录的元数据信息，我们只要知道一个对象的地址，就可以根据HeapArena.bitmap信息扫描它内部是否含有指针；也可以根据对象地址计算出它在哪一页，然后通过HeapArena.spans信息查到该对象存在哪一个mspan中。
+>基于HeapArena记录的元数据信息，我们只要知道一个对象的地址，
+>>就可以根据HeapArena.bitmap信息扫描它内部是否含有指针；
+>>也可以根据对象地址计算出它在哪一页，然后通过HeapArena.spans信息查到该对象存在哪一个mspan中。
+
+
+#### span
 
 - 而每个span都对应两个位图标记：mspan.allocBits和mspan.gcmarkBits。
   - （1）allocBits中每一位用于标记一个对象存储单元是否已分配。
