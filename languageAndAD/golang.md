@@ -34,6 +34,14 @@
 
 ### string
 
+指针和字节大小
+
+```
+0xxxxxxx
+110xxxxx 10xxxxxx
+1110xxxx 10xxxxxx 10xxxxxx
+```
+
 ### slice和数组的异同
 
 ### map
@@ -53,6 +61,28 @@ type T1 struct {
 [testMe](https://goplay.tools/snippet/6kzzmHddQgc)
 
 - 24 byte
+
+### chan
+
+
+```go
+type hchan struct {
+    qcount   uint           // - 数组长度，即已有元素个数
+    dataqsiz uint           // - 数组容量，即可容纳元素个数
+    buf      unsafe.Pointer // - 数组地址
+    elemsize uint16         // - 元素大小
+    closed   uint32
+    elemtype *_type // 元素类型 golang运行时中，内存复制、垃圾回收等机制依赖数据的类型信息，所以hchan中还要有一个指针，指向元素类型的类型元数据
+    sendx    uint   // - 下一次写下标位置
+    recvx    uint   // - 下一次读下标位置
+    recvq    waitq  // 读等待队列
+    sendq    waitq  // 写等待队列
+    lock     mutex
+}
+```
+
+> 前面有```-```的就是无缓冲chan不需要的字段。
+
 
 
 ## 跟类型相关
@@ -601,6 +631,10 @@ func main() {
 ### golang的chan
 
 - ![20201217212124](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217212124.png)
+
+> ''里面的是chan的状态(eg: 一个零值nil通道;一个非零值但已关闭的通道)
+>> '空'读写阻塞-关闭恐慌;
+>> '关闭'读为0-关闭写恐慌.
 
 - what:
   - 通道的主要作用是用来实现并发同步
