@@ -32,9 +32,17 @@
 
 ## 数据结构
 
+1. 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 
+  1.1 上面已经能想到个大概.
+2. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能?
+
 ### string
 
+string类型的底层结构.它的大小是几个字节? 
+
 指针和字节大小
+
+![UTF-8](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130201754.png)
 
 ```
 0xxxxxxx
@@ -44,9 +52,99 @@
 
 ### slice和数组的异同
 
+
+golang数组是一个指向数组头地址的指针,但是如果你引用超过数组的长度,它会编译不通过.
+- 如果使用reflect来```reflect.ValueOf(array).Index(out_of_range_index)```它会在运行时panic(我猜时因为interface{}中_type的类型指明数组的大小是多少,所以会有一个判断.)
+  - [type arraytype struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L403)
+
+```go
+type arraytype struct {
+	typ   _type
+	elem  *_type
+	slice *_type
+	len   uintptr
+}
+```
+
+
+
+#### slice的自动扩容后的大小是多少?
+
+分三步来判断:
+
+```
+var newCap int
+
+if oldCap*2<nowNeedCap{
+	newCap = nowNeedCap
+}else{
+	if oldCap<1024 {
+		newCap =oldCap*2
+	}else{
+		newCap =oldCap*1.25
+	}
+}
+
+realNewCap := compare(内存管理模块的细分大小, newCap*EveryElementSize)
+```
+
+![20210130203140](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130203140.png)
+
+
+#### 延伸
+
+![20210130203237](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130203237.png)
+
+
+![20210130203436](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130203436.png)
+
+
 ### map
 
+
+- map的底层是哈希表
+  - 哈希表的得到buctet的位置一般通过取模,与运算法
+    - hash%m
+	- hash&(m-1) //其中m一定要是2的整数倍,然后它减一,才会使它的后面的值都是1.否则就会导致低位buctet不会被选中的情况.
+  - 哈希冲突
+    - 开放寻址法
+	- 拉链法
+	  - 跳表
+	  - 建立新bucket,慢慢迁移到新bucket.
+
+
+![20210130215651](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130215651.png)
+
+![20210130215740](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130215740.png)
+
+#### 哈希扩容
+
+![20210130220033](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130220033.png)
+
+
+![20210130220422](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130220422.png)
+
+#### 扩容规则
+
+![20210130220816](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130220816.png)
+
+
 ### struct和内存对齐
+
+- 懂得内存为什么要对齐,如果不对齐会怎么样?
+  - 不对齐,可能从内存中读一个数据需要读两次,因为总线的原因
+- 所以看一个类型的内存对齐,总的原则是不要读两次,尽量不要浪费内存.
+  - 比如32位(4byte) 下:
+    - 小于4byte的类型以他们自己的类型长度为内存对齐.
+	- 大于等于4byte以4byte.
+	  - 一个struct类型,他的内存对齐为里面field中最大的那个.
+
+- 判断一个struct在内存中占用的字节数,
+  - 先按照它的各个field以struct的开始地址作为0,开始一个个排好,
+  - 最后要符合这个struct类型的内存对齐.
+
+
+![20210130214502](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130214502.png)
 
 - test
 
@@ -86,6 +184,9 @@ type hchan struct {
 
 
 ## 跟类型相关
+
+- what:都需要思考在内存中怎么表示的?
+
 ### 类型系统
 
 ```go
@@ -126,15 +227,18 @@ type slicetype struct {
 ```
 [type slicetype struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L416)
   - 其中```_type```[type _type struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L31)
-  - 其中```uncommontype```[type uncommontype struct {](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L353)
+  - 其中```uncommontype```[type uncommontype struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L353)
 
 ![类型总结](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118183705.png)
 
-
+rune与int32就是别名关系.
+// TODO
+如何比较它们是否相等?
 
 ### 跟函数定义的结构相关
 
 - ```Function Value```本质上是一个指针，却不直接指向函数指令入口，而是指向```runtime.funcval结构体```,然后再由这个结构体来指向函数指令入口。
+  - 为了闭包.
 
 ```go
 type funcval struct {
@@ -160,11 +264,19 @@ type funcval struct {
 
 
 - 如果一个函数调用几个函数,且他们的形参个数不一, 大小不一, 那么这个caller的栈大小,是:
-自己的参数+最大参数字节和的callee的值.
+自己的参数+最大(参数字节和)的callee的值.
 ![20210118203215](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118203215.png)
 
 
 #### 闭包
+
+- what:在内存中怎么表示的
+  - 闭包有自由变量(函数外定义,函数内被引用).
+  - go语言里面返回一个闭包函数其实就是:**一个funcval结构体加上捕获的变量**.
+    - 只是如果这个变量在赋给初值以后没有再改变,与后面又被改变两种情况.
+- why:
+- how:
+  - 通过有捕获列表的Function Value实现.
 
 ![20210118202701](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118202701.png)
 
@@ -173,22 +285,46 @@ type funcval struct {
 
 #### 方法(method)
 
-
+// TODO 
 
 
 #### defer三阶段
 
-只要懂得```defer```函数其实会被编译器编译成```deferproc function```。
+- what:
+  - defer在内存中怎么表示的?
+    - 调用```defer B(a)```[a是int64]--->```func deferproc(size int32, fn *funcval)```--->```deferproc(8, B's funcval Addr)```,就变成了调用deferproc函数.[func deferproc(siz int32, fn *funcval)](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L223)
+	- ![20210131115103](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131115103.png)
+- why:
+- how:
+
+
+>只要懂得```defer```函数其实会被编译器编译成```deferproc function```。
+
 ##### before 1.13
+
+> deferproc函数填充一个[_defer结构体](https://github.com/golang/go/blob/6b37b15d9520f9fa2b819e66a37fac4b2d08da78/src/runtime/runtime2.go#L907),参数注册时候会拷贝到堆上,执行时候又拷贝到栈上.
+>>![20210131115535](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131115535.png)
+>> [生成的_defer struct放到g._defer链表,且每次都放链表头,这样串联起来.](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L244)
+>> [g._defer](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/runtime2.go#L417)
 
 ![20210118204052](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204052.png)
 
 ![20210118204243](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204243.png)
 
-![20210118204350](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204350.png)
+###### 测试题
+
+- ![小测试](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204350.png)
+
 ##### 1.13
 
-![20210118205046](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205046.png)
+- 1.13如何解决慢的问题?
+  - why:为什么慢?
+    - ![before 1.13问题](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131120919.png)
+
+  - how:
+    - 不让_defer结构体参数在栈和堆之间进行拷贝,直接在栈上定义_defer结构体,和参数.
+	  - [func deferprocStack(d *_defer)](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L276)
+      - ![20210118205046](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205046.png)
 
 ```go
 package main
@@ -219,6 +355,16 @@ func Defer(i int)(r int){
 
 ##### 1.14
 
+
+- 1.14如何解决慢的问题?
+  - why:为什么慢?
+    - ![before 1.13问题](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131120919.png)
+  - how:
+    - 直接省去上面两个步骤: 省去构造_defer链表项,并注册到g._defer链表的过程.
+	  - 把defer后面函数需要的参数定义为局部变量,然后在函数返回前直接调用defer后面的函数.
+	  - 如果需要到执行阶段才能确定是否需要被调用执行, go使用标识变量df来解决这个问题.```var df byte```df中的每一位标识一个defer函数是否需要被执行	.
+
+
 ![20210118205208](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205208.png)
 
 - 思考为什么不支持循环defer?
@@ -230,21 +376,98 @@ func Defer(i int)(r int){
 
 #### panic AND recover
 
+first: panic执行defer函数的方式:先标记后释放,为了终止之前发生的panic.
+second: 异常信息的输出方式:所有还在panic链表上的项都会被输出.
+
+- what:
+  - ```panic()```函数执行的时候也是填充一个[type _panic struct](https://github.com/golang/go/blob/6b37b15d9520f9fa2b819e66a37fac4b2d08da78/src/runtime/runtime2.go#L942)结构体,放入```goroutine's _panic```链表中,然后不再执行panic后面的代码,返回,就开始检查```goroutine's _defer```链表,如果发现_defer's SP是这个panic所在函数的,就先置started为true,_panic指针指向导致这个defer运行的panic(**这是为了当defer里面又有其他panic**).当defer执行完后再执行g._panic从链表尾开始输出.
+- why:
+- how:
+  - ![20210131142819](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131142819.png)
+  - panic--->defer-->panic
+    - ![defer内部再次panic](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131144806.png)
+
+
+recover
+![20210131154620](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131154620.png)
+- what: 
+  - recover只把当前的_panic.recoved设置为true.
+    - 然后panic流程会在每个defer执行完毕后,检查次panic是否已经恢复,如果恢复就把它从g._panic链表中移除.
+	  - ![20210131152805](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131152805.png)
+- why:
+- how:
+  - 当_panic被移除后,我们需要跳出panic流程,我们就恢复到defer执行流程(利用它里面的SP, PC),最后ret==1,跳转到[func deferreturn(arg0 uintptr)](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L524)
+    - ![20210131154527](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131154527.png)
+```go
+func deferreturn(arg0 uintptr) {
+	//...
+	sp := getcallersp()
+	if d.sp != sp { // 如果g._defer链表中头的SP不相等(说明不是这个函数定义的defer)就跳出,不再继续执行.
+		return
+	}
+```
+
+
+https://goplay.tools/snippet/qoxyANNV481
+
+##### 测验
+
+它的输出结果是什么?
+
+```go
+package main
+import (
+	"fmt"
+)
+func deferA() {
+	fmt.Println("deferA")
+	panic("panicA")
+
+}
+func main() {
+	defer deferA()
+	fmt.Println("Hello World")
+	panic("main")
+}
+```
+https://goplay.tools/snippet/G5zFPvuiEdJ
 
 
 
+```go
+package main
 
+import (
+	"fmt"
+)
+
+func A() {
+	defer A1()
+	defer A2()
+	panic("panicA")
+}
+
+func A1() {
+	fmt.Println("A1")
+}
+
+func A2() {
+	defer B1()
+	panic("panicA2")
+}
+func B1() {
+	p := recover()
+	fmt.Println("B1--->", p)
+}
+func main() {
+	A()
+}
+```
+
+https://goplay.tools/snippet/phXUi8KDi61
 
 ### 跟interface相关
 
-```go
-type interfacetype struct {
-	typ     _type
-	pkgpath name
-	mhdr    []imethod
-}
-```
-[type interfacetype struct {](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L366)
 
 #### 接口
 
@@ -254,8 +477,28 @@ iface
 	interfacetype
 ```	
 
-![20210118205914](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205914.png)
-![20210119141924](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119141924.png)
+##### eface
+
+> ![20210118205914](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205914.png)
+>> 其中```_type```[type _type struct](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L31)
+
+
+##### iface
+
+
+> ![20210119141924](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119141924.png)
+>> [type interfacetype struct {](https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L366)
+```go
+type interfacetype struct {
+	typ     _type
+	pkgpath name
+	mhdr    []imethod
+}
+```
+
+- 如果接口类型与动态类型确定了,那么itab的就固定了,此时它是可以复用的.
+  - go会把itab缓存起来.
+
 ![20210119142057](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119142057.png)
 
 #### 类型断言
@@ -267,6 +510,27 @@ iface
 
 
 ##### reflect.Type
+
+- what:
+  - [TypeOf](https://github.com/golang/go/blob/9ec21a8f347e760945ca0f58ad72062588f08577/src/reflect/type.go#L1368)
+```go
+// TypeOf returns the reflection Type that represents the dynamic type of i.
+// If i is a nil interface value, TypeOf returns nil.
+func TypeOf(i interface{}) Type {
+	eface := *(*emptyInterface)(unsafe.Pointer(&i))
+	return toType(eface.typ)
+}}
+```
+- why:
+- how:
+  - TypeOf它的**输入参数是eface**,**返回参数是iface类型**(因为[type Type interface](https://github.com/golang/go/blob/9ec21a8f347e760945ca0f58ad72062588f08577/src/reflect/type.go#L38)是一个非空接口类型.)
+    - 所以需要转换一下,下图有说明.
+
+> confliction:
+>> 空接口类型的参数只能接收地址的需求.
+>>> ![20210131171655](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131171655.png)
+>>> TOOD:感觉这个地方与reflect不能Set成员函数也有关系.
+
 
 ![20210119152902](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119152902.png)
 
