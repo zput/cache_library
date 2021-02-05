@@ -31,7 +31,7 @@
 
 \section{工作经历}
 
-\datedsubsection{\textbf{深圳乐天童创科技有限公司}， 平台架构部golang开发工程师}{2019.7-至今}
+\datedsubsection{\textbf{深圳乐天童创科技有限公司}， 平台架构部golang高级开发工程师}{2019.7-至今}
 \begin{itemize}[parsep=0.2ex]
    \item 企业上云，整合服务，上k8s。整理前有十几个beego独立的微服务，逻辑混乱，前端调用的接口URI相同前缀但不同后缀，可能各自分布在几个微服务中，无法进行负载均衡,扩容分散流量，作为发起者，重构服务,商讨路由整合, 缩减微服务到7个，并编写helm，服务都上到k8s。性能从10QPS提升到200QPS，测试加正式服务器由10台减少到5台。
       %(\url(helm参考)
@@ -52,7 +52,7 @@
       %  - 2020-08-15 20:16:00
 \end{itemize}
 
-\datedsubsection{\textbf{深圳云之梦科技有限公司}， 研发部golang高级开发工程师}{2018.9-2019.7}
+\datedsubsection{\textbf{深圳云之梦科技有限公司}， 研发部golang开发工程师}{2018.9-2019.7}
 \begin{itemize}[parsep=0.2ex]
   \item 开发小程序，微信公众号，淘宝内的H5架构平台。
   \item 构建开放平台,为商户提供统一公司服务的接口。
@@ -66,12 +66,12 @@
 
 \section{一些开源项目}
 \begin{itemize}[parsep=0.2ex]
-  \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件。(\url{https://github.com/zput/innodb\_view})
+  \item \textbf{innodb\_view}用于分析MySQL的innodb引擎中物理存储文件。(\url{https://github.com/zput/innodb_view})
     \begin{itemize}[parsep=0.2ex]
         \item Innodb\_view是一个直接访问MySQL InnoDB存储引擎文件的Golang实现。通过命令行可以遍历所有已经使用的页，分析每个页的类型; 分析Inode page页面组成;Index page页面的组成等。此外，这个项目可加深对MySQL innodb物理页面内部结构理解。
     \end{itemize}
 
-  \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能，非阻塞和轻量级网络框架，不使用标准golang语言net网络包， 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统))， 轻松快速搭建高性能服务器。(\url{https://github.com/zput/zput\_net\_golang})
+  \item \textbf{zput\_net\_golang}基于事件驱动(Reactor模式)的高性能，非阻塞和轻量级网络框架，不使用标准golang语言net网络包， 它的多路复用根据不同系统使用不同的系统函数(epoll(linux系统)和kqueue(FreeBSD系统))， 轻松快速搭建高性能服务器。(\url{https://github.com/zput/zput_net_golang})
     \begin{itemize}[parsep=0.2ex]
           \item 非阻塞I/O。
           \item 多Goroutine支持，每个Goroutine运行一个事件驱动的事件循环。
@@ -87,7 +87,7 @@
           \item 当使用探索类函数(ExploreBegin()----ExploreRead()/ExploreSize()----ExploreCommit()/ExploreBreak())，可以预先探索缓存中的数据，最后可以决定是提交还是放弃。
     \end{itemize}
 
-  \item \textbf{zxc\_net}zxc\_net是基于Reactor模式的多线程C++网络库。(\url{https://github.com/zput/zxc\_net})
+  \item \textbf{zxc\_net}zxc\_net是基于Reactor模式的多线程C++网络库。(\url{https://github.com/zput/zxc_net})
     \begin{itemize}[parsep=0.2ex]
           \item 依赖于C++11提供的std::thread库，多线程表现在:
             \begin{itemize}[parsep=0.2ex]
@@ -102,11 +102,11 @@
 
 \section{杂谈}
 \begin{itemize}[parsep=0.2ex]
-  \item \textbf{golang调度} \url{https://zput.github.io/categories/golang%E8%B0%83%E5%BA%A6/}
+  \item \textbf{golang调度} \url{https://zput.github.io/go-goroutine/}
   \item \textbf{内部做的技术分享PPT}:
   \begin{itemize}[parsep=0.2ex]
-    \item \textbf{chan}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
-    \item \textbf{goroutine}: \url{https://docs.google.com/presentation/d/1_MHlcc7JOHVGNGYSUVtMDuKA_rKWi76IU9OEkb4XziY/edit?usp=sharing}
+    \item \textbf{chan}: \url{https://docs.google.com/presentation/d/1q0NP8jtJacfSjFaKFSTi_5MMXNVuSomji3ytbSLKgts/edit?usp=sharing}
+    \item \textbf{goroutine}: \url{https://docs.google.com/presentation/d/1JoRSCB_UVHClv3JpkyvM5CWfu2reFvxAXgD1LgvXCUU/edit?usp=sharing}
   \end{itemize}
 \end{itemize}
 

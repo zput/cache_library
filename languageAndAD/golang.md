@@ -1,4 +1,7 @@
 
+'空'读写阻塞-关闭恐慌;
+'关闭'读为0-关闭写恐慌. 如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数据
+
 - 数据结构:
 	- string
 	- slice和数组的异同
@@ -28,6 +31,7 @@
 		- GC
 		- 逃逸
 		- 内存分配
+        - 内存泄漏
 
 
 ## 数据结构
@@ -51,6 +55,16 @@ string类型的底层结构.它的大小是几个字节?
 ```
 
 ### slice和数组的异同
+
+
+Go中有两种取子切片的语法形式（假设baseContainer是一个切片或者数组）：
+```go
+baseContainer[low : high]       // 双下标形式
+baseContainer[low : high : max] // 三下标形式
+```
+上面所示的双下标形式等价于下面的三下标形式：```baseContainer[low : high : cap(baseContainer)]```
+
+子切片表达式的结果切片的长度为high - low、容量为max - low。
 
 
 golang数组是一个指向数组头地址的指针,但是如果你引用超过数组的长度,它会编译不通过.
@@ -624,6 +638,112 @@ const 	flagKindMask    flag = 1<<flagKindWidth -
 // --------------------------
 ```
 
+
+
+
+## 运行时:
+
+### 内存管理
+#### 内存泄漏
+
+what:
+- 临时性内存泄露
+  - 底层共用同一个内存空间引起的：
+    - 子字符串造成的暂时性内存泄露
+    - 子切片造成的暂时性内存泄露
+    - 因为未重置丢失的切片元素中的指针而造成的临时性内存泄露
+    ```go
+    func h() []*int {
+    	s := []*int{new(int), new(int), new(int), new(int)}
+    	// 使用此s切片 ...
+    
+    	//s[0], s[len(s)-1] = nil, nil // 添加这一行:重置首尾元素指针
+    
+    	return s[1:3:3]
+    }
+    ```
+   - 延迟调用函数导致的临时性内存泄露
+
+- 永久性内存泄露
+  - 因为协程被永久阻塞而造成的永久性内存泄露
+   泄露的场景不仅限于以下两类，但因channel相关的泄露是最多的。
+    - channel的读或者写：
+	  - '空'读写阻塞-关闭恐慌; <---> '关闭'读为0-关闭写恐慌.如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数.
+      - 写：
+        - 无缓冲channel的阻塞通常是写操作因为没有读而阻塞
+	    - 有缓冲的channel因为缓冲区满了，写操作阻塞
+	  - 读：期待从channel读数据，结果没有goroutine写
+    - select操作，select里也是channel操作，如果所有case上的操作阻塞，goroutine也无法继续执行。
+  - 因为没有停止不再使用的time.Ticker值而造成的永久性内存泄露
+  - 因为不正确地使用终结器（finalizer）而造成的永久性内存泄露
+
+
+
+how: 怎么发现内存泄露,
+  - 在Go中发现内存泄露有2种方法:
+    - 一个是通用的监控工具;
+	- 另一个是go pprof。
+
+当连接在服务器终端上的时候，是没有浏览器可以使用的，Go提供了命令行的方式，能够获取以上5类信息，这种方式用起来更方便。
+
+使用命令```go tool pprof url```可以获取指定的profile文件，此命令会发起http请求，然后下载数据到本地，**之后进入交互式模式**(*只要进入到交互模式说明已经下载完成，与将要调查的程序无关了*).
+```sh
+# 下载cpu profile，默认从当前开始收集30s的cpu使用情况，需要等待30s
+go tool pprof http://localhost:6060/debug/pprof/profile   # 30-second CPU profile
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=120     # wait 120s
+
+# 下载heap profile
+go tool pprof http://localhost:6060/debug/pprof/heap      # heap profile
+
+# 下载goroutine profile
+go tool pprof http://localhost:6060/debug/pprof/goroutine # goroutine profile
+
+# 下载block profile
+go tool pprof http://localhost:6060/debug/pprof/block     # goroutine blocking profile
+
+# 下载mutex profile
+go tool pprof http://localhost:6060/debug/pprof/mutex
+```
+
+- top
+  - 按前面下载的指标是什么，按照它们的大小列出前10个函数，**比如heap是按heap占用多少。**
+- list function_name
+  - 查看某个函数的代码，以及该函数每行代码的指标信息，如果函数名不明确，会进行模糊匹配，比如list main会列出main.main和runtime.main。
+- traces
+  - 打印所有调用栈，以及调用栈的指标信息。
+
+```sh
+// 隔一段时间分别运行，抓取它的heap信息.
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+// 使用-base Options来以001作为基准，与003来比较。
+go tool pprof -base pprof.main.alloc_objects.alloc_space.inuse_objects.inuse_space.001.pb.gz pprof.main.alloc_objects.alloc_space.inuse_objects.inuse_space.003.pb.gz
+
+// top 
+top 
+
+// list 上面展示的函数，查看具体代码行。
+list xxxxx
+```
+
+
+
+https://segmentfault.com/a/1190000019222661
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 0.方法
 
 - 为指针类型属主隐式声明的**方法**
@@ -898,7 +1018,7 @@ func main() {
 
 > ''里面的是chan的状态(eg: 一个零值nil通道;一个非零值但已关闭的通道)
 >> '空'读写阻塞-关闭恐慌;
->> '关闭'读为0-关闭写恐慌.
+>> '关闭'读为0-关闭写恐慌. 如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数据
 
 - what:
   - 通道的主要作用是用来实现并发同步
