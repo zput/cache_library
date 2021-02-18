@@ -20,7 +20,7 @@
 服务间通信：HTTP、TCP、UDP、MQ（同步），HTTP、MQ（异步）
 服务可靠性：TTL/Interval、基于Wrapper的限流、熔断等特性
 
---- 
+---
 ---
 
 - how:

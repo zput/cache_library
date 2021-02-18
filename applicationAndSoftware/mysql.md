@@ -111,3 +111,128 @@ limit               # 7
       - ~~意向锁是 InnoDB 自动加的， 不需用户干预。~~
   
 
+
+# 表空间的格式
+
+![InnoDB的物理结构](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210218140846.png)
+segment和extent是InnoDB内部用于分配管理页的逻辑结构，用于分配与回收页，对于写入数据的性能至关重要。
+ 
+但这张图有所局限性，可能会产生误解：
+ 
+1）图中是系统表空间，因此存在rollback segment，独立表空间则没有。
+2）leaf node segment实际是InnoDB的inode概念，一个segment可能包含最多32个碎片page、0个extent（用于小表优化），或者是非常多的extent，我猜测作者图中画了4个extent是在描述表超过32MB大小的时候一次申请4个extent。
+3）一个extent在默认16k的page大小下，由64个page组成，page大小由UNIV_PAGE_SIZE定义，所以extent不一定由64个page组成。
+
+表的所有行数据都存在页类型为INDEX的索引页（page）上，为了管理表空间，还需要很多其他的辅助页，例如文件管理页FSP_HDR/XDES、插入缓冲IBUF_BITMAP页、INODE页等。
+
+## 页的结构
+
+![innodb_files](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_files.png)
+
+MySQL一次IO的最小单位是页（page），也可以理解为一次原子操作都是以page为单位的，默认大小16k。刚刚列出的所有物理文件结构上都是以Page构成的，只是page内部的结构不同。
+
+
+### 文件管理页
+
+- 文件管理页的页类型是FSP_HDR和XDES（extent descriptor），用于分配、管理extent和page。
+  - FSP_HDR和XDES的唯一区别，
+    - 它们两者除了```FSP Header```这个位置只在FSP_HDR有值，在XDES中是用0填充的；其他field都一样。都是类似的一堆结构(一个占40字节的XDES entry描述维护extent的)
+      - ```FSP Header```这个field，它在XDES页中是空的```(zero-filled for XDES pages) ---> (112)```; page 0(FSP_HDR页面)中FSP_HDR中有值。
+      - FSP_HDR页都是page 0，XDES页一般出现在page 16384, 32768等固定的位置。一个FSP_HDR或者XDES页大小同样是16K。
+  - 一般情况下，每个extent都有一个占40字节的XDES entry描述维护，因此1个(FSP_HDR/XDES)页最多管理256个extent（也就是256M，16384个page）。那么随着表空间文件越来越大，就需要更多的XDES页。(所以才会出现在16384, 32768的位置)
+    - FSP header:
+      - 而FSP Header里面最重要的信息就是四个链表头尾数据（FLST_BASE_NODE结构，FLST意思是first and last），FLST_BASE_NODE如下。
+        - 1）当一个Extent中所有page都未被使用时，挂在FSP_FREE list base node上，可以用于随后的分配；
+        - 2）有一部分page被写入的extent，挂在FREE_FRAG list base node上；
+        - 3）全满的extent，挂在FULL_FRAG list base node上；
+        - 4）归属于某个segment时候挂在FSEG list base node上。
+      - **当InnoDB写入数据的时候，会从这些链表上分配或者回收extent和page，这些extent也都是在这几个链表上移动的。**
+    - XDES entry
+      - XDES entry存储所管理的extent状态：
+        - 1）FREE（空）
+        - 2）FREE_FRAG（至少一个被占用）
+        - 3）FULL_FRAG（满）
+        - 4）归某个segment管理的信息
+      - XDES entry还存储了每个extent内部page是否free（有空间）信息（用bitmap表示）。XDES entry组成了一个双向链表，同一种extent状态的收尾连在一起，便于管理。
+
+
+![innodb_file_struct_manager](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_manager.png)
+
+
+### INODE页
+
+- what:
+  - ![innodb_file_struct_inode](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_inode.png)
+- why:
+
+- how:
+  - segment是表空间管理的逻辑单位。INODE页就是用于管理segment的，每个Inode entry负责一个segment。
+    - 一个segment由32个碎片页（fragment array），FSEG_FREE、FSEG_NOT_FULL、FSEG_FULL组成，这些信息记录在Inode entry里，可以简单理解为Inode就是segment元信息的载体。
+      - FREE、NOT_FULL、FULL三个FLST_BASE_NODE对象和FSP_HDR/XDES页里面的FSP_FREE、FREE_FRAG、FULL_FRAG、FSEG概念类似。这些链表被InnoDB使用，用于高效的管理页分配和回收。
+      - 至于碎片页上（fragment array），用于优化小表空间分配，先从全局的碎片分配Page，当fragment array填满（32个槽位）时，之后每次分配一个完整的Extent，如果表大于32MB，则一次分配4个extent。
+
+  - MySQL的数据是按照B+ tree聚簇索引（clustered index）组织数据的，每个B+ tree使用两个segment来管理page，分别是leaf node segment（叶子节点segment）和non-leaf node segment（非叶子节点segment）。
+    - 这两个segment的Inode entry地址记录在B+ tree的root page中FSEG_HEADER里面，而root page又被分配在non-leaf segment第一个碎片页上（fragment array）。
+
+### INDEX数据索引页
+
+
+#### 聚簇和非聚簇
+
+- what:
+  - Clustered/Unclustered
+    - Clustered
+      - Index determines the location of indexed records
+      - Typically, clustered index is one where values are data records (but not necessary)
+    - Unclustered
+      - Index cannot reorder data, does not determine data location
+      - In these indexes: value = pointer to data record
+    - ![20210218151054](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210218151054.png)
+    - ![20210218151136](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210218151136.png)
+- why:
+- how:
+  - 就是它的实际数据也是按照顺序排的，那么可以向上和向下查找，但是如果是非聚族的，它如果想找比它大一点点的值，你不可能从Data file里面就能找到，你必须回归到Data entries？
+  - 使用B+树聚簇索引（B+ tree clustered index）的好处在于，
+    - 1）数据和索引顺序一致，充分利用磁盘顺序IO性能普遍高于随机IO的特性。
+    - 2）对于局部性查询也会大有裨益。
+    - 3）采用B+树，叶子节点（leaf node）存储数据，**非叶子节点（non-leaf node）只是索引，这样非叶子节点就会足够的小(一个页面就能存储很多的节点，查找的时候，减少了磁盘io)**，因此数据很“热”，便于更好的缓存。
+    - 4）对于覆盖索引，可以直接利用叶子节点的主键值。
+  - 二级索引，就可以理解为非聚簇索引，也是一颗B+树，只不过这棵树的叶子节点是指向聚簇索引主键的，可以看做“行指针”，因此查询的时候需要“回表”。
+
+
+#### index
+
+- what:
+  - ![innodb_file_struct_index](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_index.png)
+
+- why:
+- how:
+
+
+
+
+[ppt](https://courses.cs.washington.edu/courses/cse444/09sp/lectures/lecture15.pdf)
+[blog](http://neoremind.com/2020/01/inside_innodb_file/)
+
+
+
+
+
+如何锁住一个范围。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
