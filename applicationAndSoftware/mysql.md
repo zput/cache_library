@@ -203,10 +203,66 @@ MySQL一次IO的最小单位是页（page），也可以理解为一次原子操
 #### index
 
 - what:
-  - ![innodb_file_struct_index](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_index.png)
-
+  ![innodb_file_struct_index](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_index.png)
+  ![20210218185953](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210218185953.png)
+  - 主键、二级索引、行和列
+    - B+树的**每个节点(包括叶子和非叶子节点)**都是一个INDEX索引页，其结构都是相同的；
+    - 对于聚簇索引，非叶子节点包含主键和child page number，叶子节点包含主键和具体的行；
+    - 对于非聚簇索引，也就是二级索引，非叶子节点包含二级索引和child page number，叶子节点包含二级索引和主键值。
+  - 叶子和非叶子都在index索引页，那么inode里面保存的segment信息，是不是这个segment用的所有页都能从这里找到，（先用的32个碎片页，然后也能从管理页中申请extent?）
 - why:
+
 - how:
+  - page directory从Fil Trailer开始从后往前写，里面包含槽位slots，每个slot 2个字节，存储了某些record在该页中的物理偏移量，例如图中最后面是infimum record的offset，最前面是supremum record的offset，中间从后往前是r4，r8，r12 record的offset，一般总是每隔4-8个record添加一个slot，这样slots就等同于一个稀疏索引（sparse index），加速页内查询的办法就是通过二分查找，查询key的时间复杂度可以降为O(logN)，由于页都在内存里面，所以查询性能可控，内存访问延迟100ns左右，如果在CPU缓存中则可能更快。
+
+
+
+##### Row Format
+
+###### what:
+
+row format可通过innodb_default_row_format参数指定，也可以在建表的时候指定。
+
+```sql
+CREATE TABLE choose_row_format (
+   id INT,
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
+```
+
+- REDUNDANT: 是比较老的格式，
+- COMPACT: 5.6版本默认，COMPACT比REDUNDANT要更节省空间，大概在20%左右。
+- DYNAMIC: 5.7版本默认，DYNAMIC在变长存储上做了更大的空间优化，对于VARBINARY, VARCHAR, BLOB和TEXT类型更友好，
+- COMPRESSED是压缩页。
+
+
+###### what:
+###### how:
+
+> row的格式在上面图中简单介绍过，由可选的两个标识+record header+body组成，具体如下。
+
+![innodb_file_struct_row_record](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/innodb_file_struct_row_record.png)
+
+![20210218190555](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210218190555.png)
+
+
+
+4）索引：序列化后存储于此，例如int类型索引主键就占用4个字节。
+对于聚簇索引的叶子节点，存储行。
+对于二级索引的叶子节点，存储行的主键值。
+对于聚簇索引和二级索引的非叶子节点，存储child page最小的key。
+上面提到的infimum和supremum中就只存字符串在行数据里。
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
