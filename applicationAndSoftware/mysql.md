@@ -350,7 +350,7 @@ CREATE TABLE choose_row_format (
 
 - MySQL通过**两阶段提交**过程来完成事务的一致性的，也即redo log和binlog的一致性的，理论上是先写redo log，再写binlog，两个日志都提交成功（刷入磁盘），事务才算真正的完成。
 
-
+https://www.cnblogs.com/wy123/p/8365234.html
 
 ## mvcc
 
