@@ -1,4 +1,115 @@
 
+- redis中有一个「核心的对象」叫做redisObject
+  - ![20210220112119](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220112119.png)
+    - 是用来表示所有的key和value的，用redisObject结构体来表示String、Hash、List、Set、ZSet五种数据类型。
+    - type表示属于哪种数据类型，encoding表示该数据的存储方式
+      - ![20210220112710](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220112710.png)
+  - String类型的数据结构存储方式有三种int、raw、embstr。
+    - int
+      - Redis中规定假如存储的是「整数型值」，比如set num 123这样的类型，就会使用 int的存储方式进行存储，在redisObject的「ptr属性」中就会保存该值。![20210220104436](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220104436.png)
+    - raw: 字符串是一个字符串值并且长度大于32个字节
+      - 使用SDS（simple dynamic string）方式进行存储
+      - 且encoding设置为raw
+    - embstr: 字符串长度小于等于32个字节
+      - 使用SDS（simple dynamic string）方式进行存储
+      - 且encoding设置为embstr
+        - SDS（simple dynamic string）
+          - len保存了字符串的长度，
+          - buf数组则是保存字符串的每一个字符元素。
+          - free表示buf数组中未使用的字节数量
+          - ![Redsi中存储一个字符串Hello时](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220111805.png) 
+            - c语言字符串与SDS对比:
+              - 获取长度的时间复杂度为O(n) | 获取长度的时间复杂度为O(1)
+              - 不是二进制安全的 | 是二进制安全的
+              - 只能保存字符串 | 还可以保存二进制数据
+              - n次增长字符串必然会带来n次的内存分配 | n次增长字符串内存分配的次数<=n
+  - hash
+    - ziplist
+      - 编码的哈希对象使用压缩列表作为底层实现， 每当有新的键值对要加入到哈希对象时， 程序会先将保存了键的压缩列表节点推入到压缩列表表尾， 然后再将保存了值的压缩列表节点推入到压缩列表表尾
+      - ![20210220144824](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220144824.png)
+    - hashtable
+      - 编码的哈希对象使用字典作为底层实现， 哈希对象中的每个键值对都使用一个字典键值对来保存：
+        - 字典的每个键都是一个字符串对象， 对象中保存了键值对的键；
+        - 字典的每个值都是一个字符串对象， 对象中保存了键值对的值。
+      - ![20210220145440](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220145440.png)
+        - Redis 的**字典**使用**哈希表**作为底层实现， 一个哈希表里面可以有**多个哈希表节点**， 而每个哈希表节点就保存了字典中的**一个键值对**。
+          - 哈希表:```typedef struct dictht {```
+          - 哈希表节点: ```typedef struct dictEntry {```
+          - 字典: ```typedef struct dict {```
+            - hash算法:
+              - 使用字典设置的哈希函数，计算键 key 的哈希值```hash = dict->type->hashFunction(key);```
+              - 使用哈希表的 sizemask 属性和哈希值，计算出索引值; 根据情况不同， ht[x] 可以是 ht[0] 或者 ht[1]```index = hash & dict->ht[x].sizemask;```
+            - 解决键冲突: **拉链法**
+              - ![20210220152248](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220152248.png)
+            - hash rehash:
+              - 一般情况下， 字典只使用```ht[0]```哈希表，```ht[1]```哈希表只会在对```ht[0]```哈希表进行 rehash 时使用。
+              - 除了```ht[1]```之外， 另一个和 rehash 有关的属性就是 rehashidx ： 它记录了 rehash 目前的进度， 如果目前没有在进行 rehash ， 那么它的值为 -1 。
+              - 步骤：
+                - 1. 为字典的 ht[1] 哈希表分配空间， 这个哈希表的空间大小取决于要执行的操作，以及 ht[0] 当前包含的键值对数量（也即是ht[0].used 属性的值）：
+                  - 如果执行的是扩展操作， 那么 ht[1] 的大小为第一个大于等于 ht[0].used * 2 的 2^n （2 的 n 次方幂）；
+                  - 如果执行的是收缩操作， 那么 ht[1] 的大小为第一个大于等于 ht[0].used 的 2^n 。
+                - 2. 将保存在 ht[0] 中的所有键值对 rehash 到 ht[1] 上面： rehash 指的是重新计算键的哈希值和索引值， 然后将键值对放置到 ht[1] 哈希表的指定位置上。
+                - 3. 当 ht[0] 包含的所有键值对都迁移到了 ht[1] 之后 （ht[0] 变为空表）， 释放 ht[0] ， 将 ht[1] 设置为 ht[0] ， 并在 ht[1] 新创建一个空白哈希表， 为下一次 rehash 做准备。
+              - 当以下条件中的任意一个被满足时， 程序会自动开始对哈希表执行扩展操作：
+                - 服务器目前没有在执行 BGSAVE 命令或者 BGREWRITEAOF 命令， 并且哈希表的负载因子大于等于 1 ；
+                - 服务器目前正在执行 BGSAVE 命令或者 BGREWRITEAOF 命令， 并且哈希表的负载因子大于等于 5 ；
+                - 负载因子: ```负载因子 = 哈希表已保存节点数量 / 哈希表大小   ====>   load_factor = ht[0].used / ht[0].size```
+              - 哈希表渐进式 rehash 的详细步骤：
+                - 1. 为 ht[1] 分配空间， 让字典同时持有 ht[0] 和 ht[1] 两个哈希表。
+                - 2. 在字典中维持一个索引计数器变量 ```rehashidx``` ， 并将它的值设置为 0(**当没有rehash的时候，它是-1**) ， 表示 rehash 工作正式开始。
+                - 3. 在 rehash 进行期间， 每次对字典执行添加、删除、查找或者更新操作时， 程序除了执行指定的操作以外， 还会顺带将 ht[0] 哈希表在 **```rehashidx```(这个变量当前的index是多是，比如0,1,2...) 索引上的所有键值对 rehash 到 ht[1]** ， 当 rehash 工作完成之后， 程序将``` rehashidx ```属性的值增一。
+                - 4. 随着字典操作的不断执行， 最终在某个时间点上， ht[0] 的所有键值对都会被 rehash 至 ht[1] ， 这时程序将 rehashidx 属性的值设为 -1 ， 表示 rehash 操作已完成。
+    - 编码转换
+      - 当哈希对象可以**同时满足**以下两个条件时， 哈希对象使用 ziplist 编码：
+        - 哈希对象保存的所有键值对的键和值的字符串长度都小于 64 字节；
+        - 哈希对象保存的键值对数量小于 512 个；
+          - 这两个条件的上限值是可以修改的， 具体请看配置文件中关于 ```hash-max-ziplist-value``` 选项和 ```hash-max-ziplist-entries``` 选项的说明。
+      - 不能满足这两个条件的哈希对象需要使用 hashtable 编码。
+
+
+
+
+- 跳跃表 ( skiplist )
+  - what:
+    - 一种有序数据结构，它通过在每个节点中维持多个指向其他节点的指针，从而达到快速访问节点的目的。
+    -  Redis使用跳跃表作为有序集合键的底层实现之一，如果一个有序集合包含的元素数量比较多，又或者有序集合中元素的成员 ( member ) 是比较长的字符串时，Redis 就会使用跳跃表来作为有序集合键的底层实现。
+  - why:
+    - 首先，因为 zset 要支持随机的插入和删除，所以它 不宜使用数组来实现，关于排序问题，我们也很容易就想到 红黑树/ 平衡树 这样的树形结构，为什么 Redis 不使用这样一些结构呢？
+      - 性能考虑： 在高并发的情况下，树形结构需要执行一些类似于 rebalance 这样的可能涉及整棵树的操作，相对来说跳跃表的变化只涉及局部 (下面详细说)；
+      - 实现考虑： 在复杂度与红黑树相同的情况下，跳跃表实现起来更简单，看起来也更加直观；
+  - how:
+    - ![20210220203234](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210220203234.png)
+    - https://lotabout.me/2018/skip-list/#%E8%B7%B3%E8%A1%A8%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%80%9D%E6%83%B3
+
+
+
+## other
+
+- SDS与c语言字符串对比:
+   - Redis使用SDS作为存储字符串的类型肯定是有自己的优势，SDS与c语言的字符串相比，SDS对c语言的字符串做了自己的设计和优化，具体优势有以下几点：
+     - 1. c语言中的字符串并不会记录自己的长度，因此「每次获取字符串的长度都会遍历得到，时间的复杂度是O(n)」，而Redis中获取字符串只要读取len的值就可，时间复杂度变为O(1)。
+     - 2. 「c语言」中两个字符串拼接，若是没有分配足够长度的内存空间就「会出现缓冲区溢出的情况」；而「SDS」会先根据len属性判断空间是否满足要求，若是空间不够，就会进行相应的空间扩展，所以「不会出现缓冲区溢出的情况」。
+     - 3. SDS还提供「空间预分配」和「惰性空间释放」两种策略。
+       - 在为字符串分配空间时，分配的空间比实际要多，这样就能「减少连续的执行字符串增长带来内存重新分配的次数」。
+         - 具体的空间预分配原则是：(这里说的是在保证字符串的长度后，还需要预先分配额外的空间大小)
+           - **「当修改字符串后的长度len小于1MB(字符串的长度小于1MB)，就会预分配额外和len一样长度的空间，即len=free；若是len大于1MB，free分配额外的空间大小就为1MB」。**
+       - 当字符串被缩短的时候，SDS也不会立即回收不适用的空间，而是通过free属性将不使用的空间记录下来，等后面使用的时候再释放。
+     - 4. SDS是**二进制安全的**，除了可以**储存字符串以外还可以储存二进制文件**（如图片、音频，视频等文件的二进制数据）；而c语言中的```字符串是以空字符串作为结束符，一些图片中含有结束符，因此不是二进制安全的```。
+
+
+
+
+
+ https://www.w3cschool.cn/hdclil/lun1dozt.html
+
+
+
+
+
+
+
+
+
 一致性，高可用这两个方面来弄。
 
 - 1. redis基础知识
