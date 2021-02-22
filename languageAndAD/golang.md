@@ -647,40 +647,70 @@ const 	flagKindMask    flag = 1<<flagKindWidth -
 ### 内存管理
 #### 内存泄漏
 
-what:
-- 临时性内存泄露
-  - 底层共用同一个内存空间引起的：
-    - 子字符串造成的暂时性内存泄露
-    - 子切片造成的暂时性内存泄露
-    - 因为未重置丢失的切片元素中的指针而造成的临时性内存泄露
-    ```go
-    func h() []*int {
-    	s := []*int{new(int), new(int), new(int), new(int)}
-    	// 使用此s切片 ...
-    
-    	//s[0], s[len(s)-1] = nil, nil // 添加这一行:重置首尾元素指针
-    
-    	return s[1:3:3]
-    }
-    ```
-   - 延迟调用函数导致的临时性内存泄露
-
-- 永久性内存泄露
-  - 因为协程被永久阻塞而造成的永久性内存泄露
-   泄露的场景不仅限于以下两类，但因channel相关的泄露是最多的。
-    - channel的读或者写：
-	  - '空'读写阻塞-关闭恐慌; <---> '关闭'读为0-关闭写恐慌.如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数.
-      - 写：
-        - 无缓冲channel的阻塞通常是写操作因为没有读而阻塞
-	    - 有缓冲的channel因为缓冲区满了，写操作阻塞
-	  - 读：期待从channel读数据，结果没有goroutine写
-    - select操作，select里也是channel操作，如果所有case上的操作阻塞，goroutine也无法继续执行。
-  - 因为没有停止不再使用的time.Ticker值而造成的永久性内存泄露
-  - 因为不正确地使用终结器（finalizer）而造成的永久性内存泄露
-
-
-
-how: 怎么发现内存泄露,
+- what:
+  - 当使用一门支持自动垃圾回收的语言编程时，一般来说我们不需要关心内存泄露问题，因为程序的运行时会负责回收不再使用的内存。 但是，我们确实也需要知道**一些特殊**的可能会造成暂时性或永久性内存泄露的**情形**。
+- why:
+  - 临时性内存泄露
+    - 底层共用同一个内存空间引起的：
+      - 子字符串造成的暂时性内存泄露
+	  ```go
+	  var s0 []int
+	  func g(s1 []int) {
+	  	// 假设s1的长度远大于30。
+	  	s0 = s1[len(s1)-30:]
+	  }
+	  ```
+      - 子切片造成的暂时性内存泄露
+      - 因为未重置丢失的切片元素中的指针而造成的临时性内存泄露
+      ```go
+      func h() []*int {
+      	s := []*int{new(int), new(int), new(int), new(int)}
+      	// 使用此s切片 ...
+      
+      	//s[0], s[len(s)-1] = nil, nil // 添加这一行:重置首尾元素指针
+      
+      	return s[1:3:3]
+      }
+      ```
+     - 延迟调用函数导致的临时性内存泄露
+	   ```go
+       func writeManyFiles(files []File) error {
+       	 for _, file := range files {
+       	 	f, err := os.Open(file.path)
+       	 	if err != nil {
+       	 		return err
+       	 	}
+       	 	defer f.Close()
+       
+       	 	_, err = f.WriteString(file.content)
+       	 	if err != nil {
+       	 		return err
+       	 	}
+       
+       	 	err = f.Sync()
+       	 	if err != nil {
+       	 		return err
+       	 	}
+       	 }
+       
+       	 return nil
+       }
+	   ```
+  - 永久性内存泄露
+    - 因为协程被永久阻塞而造成的永久性内存泄露
+     泄露的场景不仅限于以下两类，但因channel相关的泄露是最多的。
+      - channel的读或者写：
+  	      - '空'读写阻塞-关闭恐慌; <---> ~~'关闭'读为0-关闭写恐慌.如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数.~~
+        - 写：
+          - 无缓冲channel的阻塞通常是写操作因为没有读而阻塞
+  	      - 有缓冲的channel因为缓冲区满了，写操作阻塞
+  	    - 读：期待从channel读数据，结果没有goroutine写
+        - select操作，select里也是channel操作，如果所有case上的操作阻塞，goroutine也无法继续执行。
+		  - ```default```
+    - 因为没有停止不再使用的time.Ticker值而造成的永久性内存泄露
+    - 因为不正确地使用终结器（finalizer）而造成的永久性内存泄露
+  
+- how: 怎么发现内存泄露,
   - 在Go中发现内存泄露有2种方法:
     - 一个是通用的监控工具;
 	- 另一个是go pprof。
@@ -723,14 +753,14 @@ go tool pprof -base pprof.main.alloc_objects.alloc_space.inuse_objects.inuse_spa
 // top 
 top 
 
-// list 上面展示的函数，查看具体代码行。
+// list 上面展示的函数，查看具体代码行。 很像gdb
 list xxxxx
 ```
 
 
 
 https://segmentfault.com/a/1190000019222661
-
+https://gfw.go101.org/article/memory-leaking.html
 
 
 
@@ -1158,11 +1188,108 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 ### 5. golang逃逸分析
 
 - what:
-  - 逃逸分析是一种确定指针动态范围的方法，可以分析在程序的哪些地方可以访问到指针。
-    - 如果一个子程序分配一个对象并返回一个该对象的指针，该对象可能在程序中的任何一个地方被访问到——这样指针就成功“逃逸”了。
-  - go消除了堆和栈的区别
-    - go在一定程度消除了堆和栈的区别，因为go在编译的时候进行逃逸分析，来决定一个对象放栈上还是放堆上，不逃逸的对象放栈上，可能逃逸的放堆上。
+  - 指针（或者引用）的逃逸(Escape): 当变量（或者对象）在方法中分配后，其指针有可能被返回或者被全局引用，这样就会被其他过程或者线程所引用.
+    - 逃逸分析: 是一种确定指针动态范围的方法，可以分析在程序的哪些地方可以访问到指针。
+	  - 必然发生逃逸:
+	    - 在某个函数中new或字面量创建出的变量，将其指针作为函数返回值，则该变量一定发生逃逸（构造函数返回的指针变量一定逃逸）；
+        - 被已经逃逸的变量引用的指针，一定发生逃逸；
+		```go
+        type User struct {
+        	Username string
+        	Password string
+        	Age      int
+        }
+        func main() {
+        	a := "aaa"
+        	u := &User{a, "123", 12}
+        	Call1(u)
+        }
+        func Call1(u *User) {
+        	fmt.Printf("%v",u)
+        }
+        /*
+        func Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+         	p := newPrinter()
+        	p.doPrintf(format, a)
+        ...
+        } 
+        func (p *pp) doPrintf(format string, a []interface{}) {
+        ...
+        p.printArg(a[argNum], rune(c))
+        ...
+        } 
+        func (p *pp) printArg(arg interface{}, verb rune) {
+        	p.arg = arg
+        	p.value = reflect.Value{}
+        ...
+        }
+        */
+
+        //-------------上面逃逸，下面没有------------------//
+
+        func main() {
+        	a := "aaa"
+        	u := &User{a, "123", 12}
+        	Call1(u)
+        }
+        func Call1(u *User) int {
+        	return Call2(u)
+        }
+        func Call2(u *User) int {
+        	return Call3(u)
+        }
+        func Call3(u *User) int {
+        	u.Username = "bbb"
+        	return u.Age * 20
+        }
+        /*
+        go run -gcflags "-m -l" main.go
+        # command-line-arguments
+        ./main.go:23:12: Call3 u does not escape
+        ./main.go:19:12: Call2 u does not escape
+        ./main.go:15:12: Call1 u does not escape
+        ./main.go:11:23: main &User literal does not escape
+        */
+		```
+        - 被指针类型的slice、map和chan引用的指针，一定发生逃逸；
+        ```go
+		func main() {
+        	a := make([]*int,1)
+        	b := 12
+        	a[0] = &b
+        
+        	c := make(map[string]*int)
+        	d := 14
+        	c["aaa"]=&d
+        
+        	e := make(chan *int,1)
+        	f := 15
+        	e <- &f
+		}
+		/*
+	    go run -gcflags "-m -l" main.go
+		# command-line-arguments
+        ./main.go:7:2: moved to heap: b
+        ./main.go:11:2: moved to heap: d
+        ./main.go:15:2: moved to heap: f
+        ./main.go:6:11: main make([]*int, 1) does not escape
+        ./main.go:10:11: main make(map[string]*int) does not escape
+		*/
+		```
+	  - 必然不会逃逸的情况：
+        - 指针被未发生逃逸的变量引用；
+        - 仅仅在函数内对变量做取址操作，而未将指针传出；
+      - 可能发生逃逸，也可能不会发生逃逸：
+        - 将指针作为入参传给别的函数；这里还是要看指针在被传入的函数中的处理过程，如果发生了上边的三种情况，则会逃逸；否则不会逃逸；
+
 - why:
+  - gc压力
+    ```go
+    //我：“golang函数传参是不是应该跟c一样，尽量不要直接传结构体，而要传结构体指针？“
+    //leader：“不对，咱们项目很多都是直接传结构体的。“
+    //我：“那样不会造成不必要的内存copy开销吗？”
+    //leader：“确实会有，但这样可以减小gc压力，因为传值会在栈上分配，而一旦传指针，结构体就会逃逸到堆上。“
+    ```
   - 不逃逸的对象放栈上，可能逃逸的放堆上:
     - gc的压力: 最大的好处应该是减少gc的压力，不逃逸的对象分配在栈上，当函数返回时就回收了资源，不需要gc标记清除。
     - 因为逃逸分析完后可以确定哪些变量可以分配在栈上，栈的分配比堆快，性能好
@@ -1177,7 +1304,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 [GoLang-逃逸分析](https://www.jianshu.com/p/ad9dbc81a0aa)
 
 
-
+https://zhuanlan.zhihu.com/p/91559562
 
 
 
