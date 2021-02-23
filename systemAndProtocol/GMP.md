@@ -20,8 +20,9 @@ why:
     - N-M: 用户程序调度; 
 
 >这个也就说明了```N-M```的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。
->>每个系统线程都有一个唯一的m0, g0与之对应，想想为什么？
->>>每个线程有自己的栈空间(而这个g0就在这个栈上)。但是是与其他的线程公用的~~代码段~~，**数据段，堆空间**,所以当创建其他的goroutine的时候，把它的协裎栈在堆上，所以它可以被其他的M调用。
+>>每个系统线程都有一个唯一的m0, g0与之对应，想想为什么？(g0的栈空间与其他的不同，它是放在系统线程的栈空间，**应该是进程的栈空间？**TODO,线程的栈空间)
+>>>每个线程有自己的栈空间(而这个g0就在这个栈上)。但是是与其他的线程公用的~~代码段~~，**数据段，堆空间**,
+>>>>所以当创建其他的goroutine的时候，把它的协裎栈在堆上，所以它可以被其他的M调用。
 
 
 how:
@@ -40,9 +41,8 @@ how:
   - 那个经典的GMP在这一阶段实际是怎么表示的，(g0,m0,allp[0]),
   - 代码加载到内存中的code segment, 从```入口-->runtime.main-->main.main```.
   - 从全局变量的角度，全局变量
-    - ```(g0,m0,sched)```;
-    - ```(allg,allm,allp)```;
-    - ```sched(midle, pidle, runq(全局queue))```.
+    - ```(g0,m0,sched)```; --->>> ```sched(midle, pidle, runq(全局运行goroutine queue))```.
+    - ```(allg,allm,allp[0,...])```;
 - 进行```mcall()-->schedule()```.
 
 ![20210114101912](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210114101912.png)
@@ -66,9 +66,24 @@ how:
 
 #### 调度的过程schedule()。
 
+TODO
+[TEXT runtime·gogo(SB), NOSPLIT|NOFRAME, $0-8](https://github.com/golang/go/blob/fa18f224c378f5831210077944e5df718efb8df5/src/runtime/asm_arm64.s#L126)
+
+
+- 1. 程序到达调度的时机;
+- 2. 选取下一个Goroutine;
+  - 全局：globrunqget()
+    - 从全局里面拿不是每次只拿一个，而是拿多个，多余一个的放入本地运行G队列(```runqput(_p_ *p, gp *g, next bool)```)。
+  - 本地P：runqget()
+  - 从其他的P中偷：findrunnable()
+    - sched.gcwaiting
+    - local runq
+    - global runq
+    - netpoll
+    - steal from other P
+- 3. 切换Goroutine cpu执行选出的Goroutine.
 
 抢占的分类
-
 
 ![fb2d3bf7-d5f6-4421-b191-b087cc0ddf5a](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/fb2d3bf7-d5f6-4421-b191-b087cc0ddf5a.jpg)
 
@@ -77,12 +92,10 @@ how:
 ![9b452c91-7377-4707-8596-a2f2ff8704e5](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/9b452c91-7377-4707-8596-a2f2ff8704e5.jpg)
 
 
-
 - 抢占又分为：函数抢占，和信号抢占
     - ![stack Preempt](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210114145818.png)
     - ![async(signal) Preempt](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/e274fe0e-275c-4072-aefc-da53922e36e7.jpg)
     - 
-
 
 ## archive
 
@@ -90,20 +103,5 @@ how:
 我们在C++一般的运行一个线程就是调用系统函数创建一个系统线程。
 1-1 N-1 N-M(如果说1-1是)
 预先创建一堆线程池，然后用户代码里面接收请求，来一个请求handle一个。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
