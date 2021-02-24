@@ -20,6 +20,33 @@
     - 2. 外面需要一个循环来定义次数（就是旧的大小）
     - 3. 注意一下不要越界
 
+- ```从heap sort得到的经验```
+  - 上面先做成一个堆的结构--->堆是什么?(比它的左右子树都大)   <-------->    二叉搜索树（某个数比它的左子树大，比右子树小）
+  - 下面的是每次把root节点拿出来，然后heapDown，选出新的最大值
+    - 当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
+    - when son's node is known:  
+      - parent's node = (son's node -1)/2
+    - when parent's node is known:
+      - left child's node = parent's node * 2 + 1
+      - right child's node = parent's node * 2 + 2
+    ```
+       like:
+        0
+       / \
+      1   2
+     / \ / \
+    3  4 5  6
+    通过这个例子来想这些公式，不需要硬记住。
+    ```
+    ```
+     _ _ _ _ _ _
+    |_ _ _ _ _ _|
+     0 1 2 3 4 5
+              len(array)-1 is 5
+              in order to find 5's parent node:   (len(array)-1-1)/2
+    ```
+
+
 
 ---
 
@@ -311,7 +338,100 @@ func main(){
 
 
 
+- heap sort
 
+```go
+package main
+
+import "fmt"
+
+func heapSort(array []int) {
+	if len(array) <= 1 {
+		return
+	}
+	/*
+ _ _ _ _ _ _
+|_ _ _ _ _ _|
+ 0 1 2 3 4 5
+          len(array)-1 is 5
+	      in order to find 5's parent node:
+	      (len(array)-1-1)/2
+	like:
+	 0
+	/ |
+  1   2
+ / \ / \
+3  4 5  6
+- when son's node is known: 	 parent's node = (son's node -1)/2
+- when parent's node is known:
+  - left child's node = parent's node * 2 + 1
+  - right child's node = parent's node * 2 + 2
+通过这个例子来想这些公式，不需要硬记住。
+
+	当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
+
+	*/
+	for i := (len(array)-1-1) / 2; i >= 0; i-- {
+		heapDown(array, len(array), i)
+	}
+	// 上面已经做成了一个堆的结构--->堆是什么?(比它的左右子树都大)   <-------->    二叉搜索树（某个数比它的左子树大，比右子树小）
+	// 下面的是每次把root节点拿出来，然后heapDown，选出新的最大值
+	length := len(array)
+	for ; length > 1; length-- {
+		array[0], array[length-1] = array[length-1], array[0]
+		heapDown(array, length-1, 0)
+	}
+	//for j:=0; j<len(array)/2;j++{
+	//	array[j], array[len(array)-1-j] = array[len(array)-1-j], array[j]
+	//}
+}
+
+func heapDown(array []int, size int, index int) { // 这个跟下面那个递归是一样的,只是把递归的那个开始判断,放到for循环条件判断里面去了.
+	for index*2+1 < size {
+		var tempIdx = index
+		if array[index] < array[index*2+1] {
+			tempIdx = index*2 + 1                 // ----------------------------------- 当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
+		}
+		if (index*2+2 < size) && array[tempIdx] < array[index*2+2] {
+			tempIdx = index*2 + 2                 // ----------------------------------- 当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
+		}
+		if tempIdx != index {
+			array[index], array[tempIdx] = array[tempIdx], array[index]
+			index = tempIdx
+		} else {
+			return
+		}
+	}
+}
+
+func heapDown2(array []int, size int, index int) {
+	if 2*index+1 >= size {
+		// complete heap down
+		return
+	}
+	var j = index
+	if array[2*index+1] > array[j] {
+		j = 2*index + 1
+	}
+	if 2*index+2 < size && array[2*index+2] > array[j] {
+		j = 2*index + 2
+	}
+	if j != index {
+		array[j], array[index] = array[index], array[j]
+		heapDown(array, size, j)
+	}
+
+
+}
+
+func main() {
+
+	var array = []int{1, 5, 7, -1, 0, 10000, 5, 9, 5, 6, 8, 7}
+	//var array = []int{1, 2, 3, 5, 1, 4, 3, 11, 4, 4, 111, 8, 3}
+	heapSort(array)
+	fmt.Println(array)
+}
+```
 
 
 
