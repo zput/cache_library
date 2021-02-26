@@ -320,9 +320,9 @@ type funcval struct {
 > deferproc函数填充一个[_defer结构体](https://github.com/golang/go/blob/6b37b15d9520f9fa2b819e66a37fac4b2d08da78/src/runtime/runtime2.go#L907),参数注册时候会拷贝到堆上,执行时候又拷贝到栈上.
 >>![20210131115535](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131115535.png)
 >> [生成的_defer struct放到g._defer链表,且每次都放链表头,这样串联起来.](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L244)
->> [g._defer](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/runtime2.go#L417)
+>>> [g._defer](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/runtime2.go#L417)
 
-![20210118204052](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204052.png)
+![deferproc函数会返回0](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204052.png)
 
 ![20210118204243](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204243.png)
 
@@ -396,6 +396,8 @@ second: 异常信息的输出方式:所有还在panic链表上的项都会被输
 
 - what:
   - ```panic()```函数执行的时候也是填充一个[type _panic struct](https://github.com/golang/go/blob/6b37b15d9520f9fa2b819e66a37fac4b2d08da78/src/runtime/runtime2.go#L942)结构体,放入```goroutine's _panic```链表中,然后不再执行panic后面的代码,返回,就开始检查```goroutine's _defer```链表,如果发现_defer's SP是这个panic所在函数的,就先置started为true,_panic指针指向导致这个defer运行的panic(**这是为了当defer里面又有其他panic**).当defer执行完后再执行g._panic从链表尾开始输出.
+    - 填充一个_panic结构体
+	- 不执行panic函数后面的代码, 执行_defer链表。
 - why:
 - how:
   - ![20210131142819](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131142819.png)
@@ -413,14 +415,35 @@ recover
 - how:
   - 当_panic被移除后,我们需要跳出panic流程,我们就恢复到defer执行流程(利用它里面的SP, PC),最后ret==1,跳转到[func deferreturn(arg0 uintptr)](https://github.com/golang/go/blob/a5a5e2c968eb14335f4e46606d8edfbdbdcea728/src/runtime/panic.go#L524)
     - ![20210131154527](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210131154527.png)
-```go
-func deferreturn(arg0 uintptr) {
-	//...
-	sp := getcallersp()
-	if d.sp != sp { // 如果g._defer链表中头的SP不相等(说明不是这个函数定义的defer)就跳出,不再继续执行.
-		return
-	}
-```
+    ```go
+    func deferreturn(arg0 uintptr) {
+    	//...
+    	sp := getcallersp()
+    	if d.sp != sp { // 如果g._defer链表中头的SP不相等(说明不是这个函数定义的defer)就跳出,不再继续执行.
+    		return
+    	}
+    ```
+    - 补充一下，上面可能很难理解，看下图，它有两个```runtime.deferreturn()```,如果函数是正常结束，那么会执行第一个```runtime.deferreturn()```。如果因为中间panic,
+      - 填充一个_panic结构体;
+	  - 不执行panic函数后面的代码, 执行_defer链表。
+      - 当_defer链表中某一个_defer有recover函数
+	    - recover只把当前的_panic.recoved设置为true.
+          - 然后panic流程会在每个defer执行完毕后,检查次panic是否已经恢复,如果恢复就把它从g._panic链表中移除.
+      - 此时，panic被移除了，---> 需要跳出这个panic流程
+	  - 恢复_defer链表中的sp,它就到了下图中的```注册~~~~~>```这个地方。
+	    - 返回1，所以跳到第二个```runtime.deferreturn()```.
+![deferproc函数会返回0](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118204052.png)
+// TODO 如何恢复？
+
+
+
+
+
+
+
+
+
+
 
 
 https://goplay.tools/snippet/qoxyANNV481
