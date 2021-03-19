@@ -8,6 +8,7 @@
 	- slice和数组的异同
 	- map
 	- struct和内存对齐
+	- error.Unwrap
 
 - 跟类型相关：
 	- 类型系统
@@ -195,6 +196,62 @@ type hchan struct {
 ```
 
 > 前面有```-```的就是无缓冲chan不需要的字段。
+
+
+### error.Unwrap
+
+- 1. 通过消除错误来消除错误处理
+- 2. [Errors are values](https://blog.golang.org/errors-are-values)
+  - 错误只处理一次
+```go
+type errWriter struct {
+    w   io.Writer
+    err error
+}
+
+func (ew *errWriter) write(buf []byte) {
+    if ew.err != nil {
+        return
+    }
+    _, ew.err = ew.w.Write(buf)
+}
+
+ew := &errWriter{w: fd}
+ew.write(p0[a:b])
+ew.write(p1[c:d])
+ew.write(p2[e:f])
+// and so on
+if ew.err != nil {
+    return ew.err
+}
+```
+
+> - 将错误视为不透明的值对于生成松散耦合的软件很重要，所以如果对错误值所做的唯一事情是如下两个方面的话，则原始错误是什么类型就无关紧要了。
+>>  - 检查是否为 nil
+>>  - 打印或记录日志
+> - 但是，在某些场景，您确实需要恢复原始错误, 然后再判断的场景吗。
+
+- 3. 向错误添加上下文
+  - ```fmt.Errorf```
+
+- 防止原始的错误类型被掩盖
+  - ```error.Unwrap```
+
+
+```
+错误发生一般是从外部，比如数据库，缓存，其他调用第三方导致的。
+
+[一般有error code] ---来源---> [转换成中间值] ---去向---> [最后变成输出给外面的error code AND error message]
+```
+
+> 其中**中间值**是在自己系统中统一的，只要**来源**到这个系统的，都要先把错误码转为系统的中间值.
+
+
+<script src="https://gist.github.com/zput/e8a55751fabb0e8ba9595f70a834f10c.js"></script>
+
+
+
+
 
 
 

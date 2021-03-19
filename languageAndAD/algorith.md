@@ -9,7 +9,7 @@
   - why:
     - 与二叉搜索树区别
       - 定义不同：二叉搜索树（某个数比它的左子树大，比右子树小）
-      - 内存占用。**普通树占用的内存空间比它们存储的数据要多。**你必须为节点对象以及左/右子节点指针分配内存。堆仅仅使用一个数据来存储数组，且不使用指针。
+      - 内存占用。**普通树占用的内存空间比它们存储的数据要多**. 你必须为节点对象以及左/右子节点指针分配内存。堆仅仅使用一个数据来存储数组，且不使用指针。
       - 平衡:
         - 二叉搜索树必须是“平衡”的情况下，其大部分操作的复杂度才能达到O(log n)。你可以按任意顺序位置插入/删除数据，或者使用 AVL 树或者红黑树，
         - 但是在堆中实际上不需要整棵树都是有序的。我们只需要满足堆属性即可，所以在堆中平衡不是问题。因为堆中数据的组织方式可以保证O(log n) 的性能。
@@ -54,7 +54,7 @@ k: 这个堆的最高有几层.
   - ( k - i) 表示子树上要比较的次数
 
 - 因为叶子层不用交换，所以i===>[k-1, 1]===>从k-1(倒数第二层)开始到1(第一层)；
-  - ````S = 2^(k-2) * 1 + 2^(k-3)*2.....+2*(k-2)+2^(0)*(k-1)```
+  - ```S = 2^(k-2) * 1 + 2^(k-3)*2.....+2*(k-2)+2^(0)*(k-1)```
     - ```2^(k-1-1)*(k-(k-1))```  ====>  ```2^(1-1)*(k-1)```  
   - 等式左右乘上2，然后和原来的等式相减，就变成了：```S = 2^(k - 1) + 2^(k - 2) + 2^(k - 3) ..... + 2 - (k-1)```
     - 除最后一项外，就是一个等比数列了，直接用求和公式：![An+1/An=q](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210224185720.png)
@@ -69,15 +69,50 @@ https://blog.csdn.net/weixin_44324174/article/details/107334890
 https://www.zhihu.com/question/20729324
 
 
-- 只要定义好循环变量的含义/范围 (定义的变量的范围，比如是左开右闭还是，左闭右开).
-  - 含义，比如在下面的```帮一个数组【正数，负数，zero】排序```,它的```positive```范围就是```positive: [left, ...)```/含义就是代表最终正数的值都在这个```positive```范围里.
+- 只要定义好循环变量的**含义/范围** (定义的变量```的范围，比如是左开右闭还是，左闭右开).```
+  - 含义: 比如下面的示例(```帮一个数组【正数，负数，zero】排序```),
+    - 它的```positive```范围就是```positive: [left, ...)```
+    - 含义就是代表最终正数的值都在这个```positive```范围里.
   - 循环变量：在运行过程中，里面的值可以变，但是含义固定不变.
 
 - ```从快排里二路快排得到的经验```
   - 判断两个区间是否还需要继续靠近，如果是整个范围都由这两个区间占据才视为结束;
     - 那么如果[___)[___]这种情况还没有占据完，左边区间是左闭右开，还有一个元素没有判断，需要继续进入到循环中进行判断.
     - [___)|[___]这种情况已占据完，左边区间是左闭右开，与右边区间左闭在一个地方，所以是整个范围都由这两个区间占据了，不需要进入循环.
-  - 当怀疑是否越界的时候，比如j-1 or i+1， 直接在脑海中想象这个区间范围,增大缩小，判断它在现有条件下，最大最小是多少,就可以消除误会了.
+  - 当怀疑是否越界的时候，比如j-1 or i+1， 直接在脑海中想象这个区间范围,增大缩小，判断它在现有条件下，最大最小是多少,就可以消除怀疑了.
+    ```go
+    func _quickSort(arr []int, left, right int) {
+    	if left >= right {
+    		return
+    	}
+    	partition := makePartition(arr, left, right)
+    	// partition := makePartition3(arr, left, right)
+    	_quickSort(arr, left, partition-1)
+    	_quickSort(arr, partition+1, right) // 这里不要写成_quickSort(arr, partition-1, right)
+    }
+    ```
+    - 三路快排的时候，循环次数，不是固定的从[left+1, right],而是[left+1, j)
+    ```go
+    func makePartition3(arr []int, l, r int) (int, int) {
+    	var partition = arr[l]
+    	// [l+1, ...)
+    	// [r+1, ...)
+    	i, j := l+1, r+1
+    	for k := l + 1; k < j; k++ {   // -----------------------here
+    		if arr[k] < partition {
+    			arr[i], arr[k] = arr[k], arr[i]
+    			i++
+    		} else if arr[k] > partition {
+    			arr[j-1], arr[k] = arr[k], arr[j-1]
+    			j--
+    			k--
+    		}
+    	}
+    	arr[l], arr[i-1] = arr[i-1], arr[l]
+    	return i - 2, j
+    }
+    ```
+
 
 
 - ```从meger得到的经验```
@@ -119,7 +154,7 @@ https://www.zhihu.com/question/20729324
 ---
 
 - 步骤:
-  - 1. 知道原理,先不要想步骤;
+  - 1. 知道原理,先别想步骤;
   - 2. 定义好每个循环变量的含义-->范围( []/(]/[)/() );
   - 3. 脑海测试(五种方法).
 
@@ -501,6 +536,154 @@ func main() {
 }
 ```
 
+
+## Test
+
+
+```go
+
+func main(){
+	var array = []int{1,2,5,7,199,3,4,6,4,4,7}
+    quickSort(array)
+    heapSort(array)
+	fmt.Println(array)
+}
+
+
+// 先二路，后三路
+
+func quickSort(arr []int){
+    if len(arr) <= 1{
+        return
+    }
+    _quickSort(arr, 0, len(arr)-1)
+    //_quickSort3(arr, 0, len(arr)-1)
+}
+
+func _quickSort(arr []int, left, right int){
+    if left >= right{
+        return
+    }
+    partition := makePartition(arr, left, right)
+    // partition := makePartition3(arr, left, right)
+    _quickSort(arr, left, partition-1)
+    _quickSort(arr, partition-1, right)
+}
+func makePartition(arr []int, l, r int)int{
+
+    var partition = arr[l]
+    // [l+1, ...)
+    // [r+1, ...)
+    i, j := l+1, r+1
+    for ;i<j; {
+        for ;i<j&&arr[i]<partition; {
+            i++
+        }
+        for ; i<j && arr[j-1]>=partition; {
+                j--
+        }
+        if i==j{
+            break
+        }
+        arr[i], arr[j-1] = arr[j-1], arr[i]
+        i++
+        j--
+    }
+    arr[l], arr[i-1] = arr[i-1], arr[l]
+    return i-1
+}
+
+// ------------------------------------------------------------------
+
+func _quickSort3(arr []int, left, right int){
+    if left >= right{
+        return
+    }
+    partitionLeft, partitionRight := makePartition3(arr, left, right)
+    _quickSort(arr, left, partitionLeft)
+    _quickSort(arr, partitionRight, right)
+}
+func makePartition(arr []int, l, r int)(int, int){
+    var partition = arr[l]
+    // [l+1, ...)
+    // [r+1, ...)
+    i, j := l+1, r+1
+    for k:= l+1; k<=r; k++{
+        if arr[k] < partition{
+            arr[i], arr[k] = arr[k], arr[i]
+            i++
+        }else if arr[k] > partition{
+            arr[j-1], arr[k] = arr[k], arr[j-1]
+            j--
+            k--
+        }
+    }
+    arr[l], arr[i-1] = arr[i-1], arr[l]
+    return i-2, j
+}
+
+```
+
+
+
+
+## 两个go程轮流打印一个切片
+
+```go
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main(){
+	//var array = []int{1, 4, 6, 4, 2, 2, 3, 3, 1, 10, 10001, 101, 564, 2, 6}
+	//var array = []int{1, 2, 3, 4, 5, 6, 7, 8}
+	//var array = []int{1, 2}
+	var array = []int{1, 2, 3}
+	printArray(array)
+}
+
+func printArray(array []int){
+/*	if len(array) == 0{
+		return
+	}*/
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var c1 = make(chan int, 1)
+	var c2 = make(chan int, 1)
+
+	c1 <- 0
+
+	var index int = 1
+
+	go func(){
+		for; index< len(array);{
+			v := <-c1
+			fmt.Println(array[v])
+			index++
+			c2<-v+1
+		}
+		wg.Done()
+	}()
+
+	go func(){
+		for; index< len(array);{
+			v2 := <-c2
+			fmt.Println("-------", v2, "-----", index)
+			fmt.Println(array[v2])
+			c1<-v2+1
+			index++
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+}
+```
 
 
 
