@@ -1,5 +1,25 @@
 
 
+<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
+
+<!-- code_chunk_output -->
+
+- [扩展](#扩展)
+  - [mutator?](#mutator)
+  - [FQA](#fqa)
+    - [谈一谈golang的gc.](#谈一谈golang的gc)
+    - [二：为什么清扫阶段不需要屏障了呢？](#二为什么清扫阶段不需要屏障了呢)
+    - [三：golang的heap结构](#三golang的heap结构)
+    - [四: **工作队列**相关的问题：并发标记的分工问题？写屏障记录集的竞争问题？](#四-工作队列相关的问题并发标记的分工问题写屏障记录集的竞争问题)
+    - [五： CUP utilization](#五-cup-utilization)
+    - [TODO: 并发GC如何缓解内存分配压力？](#todo-并发gc如何缓解内存分配压力)
+- [附录](#附录)
+  - [内存分配器](#内存分配器)
+    - [heapArena](#heaparena)
+    - [span](#span)
+
+<!-- /code_chunk_output -->
+
 
 
 
@@ -47,14 +67,17 @@
     - 混合写屏障 + 两Goroutine之间交流
 
 ---	
-  - The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier). 混合写屏障的时候要求新对象被分配为黑色（这里我猜是所有的对象，栈对象，或者堆对象也好）
-  - once a stack has been scanned and blackened, it remains black. 一旦栈被扫描（这个的扫描是第一次扫描，查找根对象的时候）和置为黑，那么它一直保持为黑
-    - 说明栈在第一次扫描的时候就会把栈上对象置为黑色？
-  - In the hybrid barrier, the two shades and the condition work together
-    - shade(*slot): 从heap到stack移动白色对象，染为灰色。（尝试如果它试图从heap中解开一个对象的链接，就会对其进行遮挡。）
-	- shade(ptr): 从stack到一个黑色的heap对象。
-	- Once a goroutine's stack is black, the shade(ptr) becomes unnecessary. shade(ptr) prevents hiding an object by moving it from the stack to the heap, but this requires first having a pointer hidden on the stack. Immediately after a stack is scanned, it only points to shaded objects, so it's not hiding anything, and the shade(*slot) prevents it from hiding any other pointers on its stack.
-  - 一个Goroutine写到另一个Goroutine:
+>  - The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier). 混合写屏障的时候要求新对象被分配为黑色（这里我猜是所有的对象，栈对象，或者堆对象也好）
+>  - once a stack has been scanned and blackened, it remains black. 一旦栈被扫描（这个的扫描是第一次扫描，查找根对象的时候）和置为黑，那么它一直保持为黑
+>    - 说明栈在第一次扫描的时候就会把栈上对象置为黑色？
+>  - In the hybrid barrier, the two shades and the condition work together
+>    - shade(*slot): 从heap到stack移动白色对象，染为灰色。（尝试如果它试图从heap中解开一个对象的链接，就会对其进行遮挡。）
+>	  - shade(ptr): 从stack到一个黑色的heap对象。
+>	  - Once a goroutine's stack is black, the shade(ptr) becomes unnecessary. shade(ptr) prevents hiding an object by moving it from the stack to the heap, but this requires first having a pointer hidden on the stack. Immediately after a stack is scanned, it only points to shaded objects, so it's not hiding anything, and the shade(*slot) prevents it from hiding any other pointers on its stack.
+>  - 一个Goroutine写到另一个Goroutine:
+
+
+
   ```
   我就是觉得混合写屏障好像也没法 解决重新扫描栈的问题。我举个例子：
   现在有 A, B, C三个对象，A(黑色，栈上)，B（灰色，栈上），C（白色，堆上）；
@@ -66,13 +89,14 @@
   B（灰） -> nil
   由于A，B是栈上的对象，栈上对象赋值这里可是没有写屏障的；那么岂不是黑色对象指向白色对象了，C会回收了，就悬挂指针了？？？
   ```
-    - Goroutine 栈扫描的过程需要 STW，所以你描述的这种状况是不存在的，**栈上的对象要么全白要么全黑**
-      - 你说的“栈上的对象要么全白，要么全黑“ ，这个只是对一个 goroutine 栈来说的（golang 暂停业务扫描栈也是一个一个来的）。如果场景是 A 在 Goroutine1，B在Goroutine2呢？这种情况就是A是黑色，B是白色或者灰色。这样会不会就有我说的原本那个问题呢？
-        - [The hybrid barrier assumes a goroutine cannot write to another goroutine's stack.(混合写屏障假设一个goroutine,不能写到另一个goroutine的栈)](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#channel-operations-and-go-statements)
-	      - 除了从一个Goroutine通过chan发送/生成一个新Goroutine
-		    - 如果两个Goroutine 栈只要有一个是灰色的，那么就会有```shade(ptr)```
-		    - 新生成的Goroutine栈都是黑色的（由前面的条件保证）,如果父Goroutine是灰色的，那么需使用```shade(ptr)```
-  
+
+>   - Goroutine 栈扫描的过程需要 STW，所以你描述的这种状况是不存在的，**栈上的对象要么全白要么全黑**
+>     - 你说的“栈上的对象要么全白，要么全黑“ ，这个只是对一个 goroutine 栈来说的（golang 暂停业务扫描栈也是一个一个来的）。如果场景是 A 在 Goroutine1，B在Goroutine2呢？这种情况就是A是黑色，B是白色或者灰色。这样会不会就有我说的原本那个问题呢？
+>       - [The hybrid barrier assumes a goroutine cannot write to another goroutine's stack.(混合写屏障假设一个goroutine,不能写到另一个goroutine的栈)](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#channel-operations-and-go-statements)
+>     - 除了从一个Goroutine通过chan发送/生成一个新Goroutine
+>	      - 如果两个Goroutine 栈只要有一个是灰色的，那么就会有```shade(ptr)```
+>	      - 新生成的Goroutine栈都是黑色的（由前面的条件保证）,如果父Goroutine是灰色的，那么需使用```shade(ptr)```
+>  
 
 
 
