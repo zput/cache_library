@@ -1,4 +1,60 @@
 
+
+
+<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
+
+<!-- code_chunk_output -->
+
+- [数据结构](#数据结构)
+  - [string](#string)
+  - [slice和数组的异同](#slice和数组的异同)
+    - [slice的自动扩容后的大小是多少?](#slice的自动扩容后的大小是多少)
+    - [延伸](#延伸)
+  - [map](#map)
+    - [哈希扩容](#哈希扩容)
+    - [扩容规则](#扩容规则)
+  - [struct和内存对齐](#struct和内存对齐)
+  - [chan](#chan)
+  - [error.Unwrap](#errorunwrap)
+- [跟类型相关](#跟类型相关)
+  - [类型系统](#类型系统)
+  - [跟函数定义的结构相关](#跟函数定义的结构相关)
+    - [函数调用栈细节](#函数调用栈细节)
+    - [闭包](#闭包)
+    - [方法(method)](#方法method)
+    - [defer三阶段](#defer三阶段)
+      - [before 1.13](#before-113)
+        - [测试题](#测试题)
+      - [1.13](#113)
+      - [1.14](#114)
+    - [panic AND recover](#panic-and-recover)
+      - [测验](#测验)
+  - [跟interface相关](#跟interface相关)
+    - [接口](#接口)
+      - [eface](#eface)
+      - [iface](#iface)
+    - [类型断言](#类型断言)
+    - [reflect](#reflect)
+      - [reflect.Type](#reflecttype)
+      - [reflect.Value](#reflectvalue)
+- [运行时:](#运行时)
+  - [内存管理](#内存管理)
+    - [内存泄漏](#内存泄漏)
+  - [0.方法](#0方法)
+  - [1. new And make](#1-new-and-make)
+    - [example](#example)
+  - [2. 值类型和引用类型的区别](#2-值类型和引用类型的区别)
+  - [3. 计算golang中类型的大小的方式](#3-计算golang中类型的大小的方式)
+  - [golang的chan](#golang的chan)
+  - [4. golang中同步的方式](#4-golang中同步的方式)
+  - [5. golang逃逸分析](#5-golang逃逸分析)
+- [archive](#archive)
+
+<!-- /code_chunk_output -->
+
+
+
+
 > ''里面的是chan的状态(eg: 一个零值nil通道;一个非零值但已关闭的通道)
 >> '空'读写阻塞-关闭恐慌;
 >> '关闭'读为0-关闭写恐慌. 如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数据
