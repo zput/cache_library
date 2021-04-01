@@ -4,6 +4,11 @@
 
 <!-- code_chunk_output -->
 
+- [理论](#理论)
+  - [三色](#三色)
+  - [新分配对象的颜色](#新分配对象的颜色)
+  - [写屏障](#写屏障)
+- [golang实现](#golang实现)
 - [扩展](#扩展)
   - [mutator?](#mutator)
   - [FQA](#fqa)
@@ -22,101 +27,18 @@
 
 
 
+## 理论
 
-为什么gc也要扫描栈，不是都在堆上面吗？
-- 因为堆上的地址，可能保存在栈上某个变量里，所以需要扫描。
+> ### what:
 
-- 一个是插入写屏障
-  - 破坏第一个条件
-  - 记住插入，---黑色----白色===》 黑色----灰色
-    ```go
-    writePointer(slot, ptr):
- 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
-	  *slot = ptr
-	```
+- gc主要是释放那些不再需要的分配在堆（heap）上的数据
 
----
+> ### why:
 
-- 一个是删除写屏障
-  - 破坏第二个条件。
-  - 删除
-  ```go
-  writePointer(slot, ptr)
-  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
-  	*slot = ptr
-  ```
-  - disadvantage:
-    - which means that many stacks must be re-scanned during STW. The garbage collector first scans all stacks at the beginning of the GC cycle to collect roots.(第一次扫描所有的栈在收集根对象的时候，不能保证在栈后面不会有黑对象引用了白对象)
+- 降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。
 
----
+> ### how:
 
-- 混合写屏障
-  - what: 混合写屏障为了**消除栈的重扫**过程.
-  ```go
-  writePointer(slot, ptr):
-      shade(*slot)
-      if current stack is grey:
-          shade(ptr)
-      *slot = ptr
-  ```
-  - why: 
-
-  - how: 通过几种方式来保证弱三色一致性
-    - STW 扫描一次协程栈(扫一个Goroutine栈就变为黑色) + 创建对象默认黑色
-      - 开启写屏障期间创建的所有对象默认都是黑色
-    - 混合写屏障 + 两Goroutine之间交流
-
----	
->  - The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier). 混合写屏障的时候要求新对象被分配为黑色（这里我猜是所有的对象，栈对象，或者堆对象也好）
->  - once a stack has been scanned and blackened, it remains black. 一旦栈被扫描（这个的扫描是第一次扫描，查找根对象的时候）和置为黑，那么它一直保持为黑
->    - 说明栈在第一次扫描的时候就会把栈上对象置为黑色？
->  - In the hybrid barrier, the two shades and the condition work together
->    - shade(*slot): 从heap到stack移动白色对象，染为灰色。（尝试如果它试图从heap中解开一个对象的链接，就会对其进行遮挡。）
->	  - shade(ptr): 从stack到一个黑色的heap对象。
->	  - Once a goroutine's stack is black, the shade(ptr) becomes unnecessary. shade(ptr) prevents hiding an object by moving it from the stack to the heap, but this requires first having a pointer hidden on the stack. Immediately after a stack is scanned, it only points to shaded objects, so it's not hiding anything, and the shade(*slot) prevents it from hiding any other pointers on its stack.
->  - 一个Goroutine写到另一个Goroutine:
-
-
-
-  ```
-  我就是觉得混合写屏障好像也没法 解决重新扫描栈的问题。我举个例子：
-  现在有 A, B, C三个对象，A(黑色，栈上)，B（灰色，栈上），C（白色，堆上）；
-  当前引用关系是：
-  A（黑） -> nil
-  B（灰） -> C（白）
-  现在应用程序赋值修改，把A指向C：
-  A（黑） -> C（白）
-  B（灰） -> nil
-  由于A，B是栈上的对象，栈上对象赋值这里可是没有写屏障的；那么岂不是黑色对象指向白色对象了，C会回收了，就悬挂指针了？？？
-  ```
-
->   - Goroutine 栈扫描的过程需要 STW，所以你描述的这种状况是不存在的，**栈上的对象要么全白要么全黑**
->     - 你说的“栈上的对象要么全白，要么全黑“ ，这个只是对一个 goroutine 栈来说的（golang 暂停业务扫描栈也是一个一个来的）。如果场景是 A 在 Goroutine1，B在Goroutine2呢？这种情况就是A是黑色，B是白色或者灰色。这样会不会就有我说的原本那个问题呢？
->       - [The hybrid barrier assumes a goroutine cannot write to another goroutine's stack.(混合写屏障假设一个goroutine,不能写到另一个goroutine的栈)](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#channel-operations-and-go-statements)
->     - 除了从一个Goroutine通过chan发送/生成一个新Goroutine
->	      - 如果两个Goroutine 栈只要有一个是灰色的，那么就会有```shade(ptr)```
->	      - 新生成的Goroutine栈都是黑色的（由前面的条件保证）,如果父Goroutine是灰色的，那么需使用```shade(ptr)```
->  
-
-
-
-
-
-https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md
-
-
----
-
-
-gc:
-
-what:
-gc主要是释放那些不再需要的分配在堆（heap）上的数据
-
-why:
-降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。
-
-how:
 - 一般判断对象是否存活是使用：是把可达性近视的认为存活性.
   - 可把栈（stack），数据段（data segment? bss?）的数据对象作为root
 
@@ -165,6 +87,180 @@ how:
 		- 又不需要在第二次STW的时，重新扫描所有活跃G的栈帧。
 
 堆（heap）上面的都有插入写屏障，不会发生hiding object。
+
+
+
+### 三色
+
+
+
+### 新分配对象的颜色
+
+黑色赋值器：已经由回收器扫描过，不会再次对其进行扫描。
+灰色赋值器：尚未被回收器扫描过，或尽管已经扫描过但仍需要重新扫描。
+
+
+如果新分配的对象为黑色或者灰色，则赋值器直接将其视为无需回收的对象，写入堆中；
+如果新分配的对象为白色，则可以避免无意义的新对象保留到下一个垃圾回收的周期。
+
+由于黑色赋值器由于已经被回收器扫描过， 不会再对其进行任何扫描，一旦其分配新的白色对象 则意味着会导致错误的回收。
+
+### 写屏障
+
+背景：如果对栈和堆都执行写屏障(不管是插入写屏障，还是删除写屏障)，那么按照三色原则，插入写屏障使它不满足强三色不变式，删除写屏障使它一定不满足弱三色不变式。但是基于性能考虑，栈上不触发写屏障。
+
+- ```writePointer(slot, ptr):```
+  - ```*slot```可能是null。
+  - ```*slot```可能是它以前关联的那个值，现在要断开。
+  - ```ptr```是现在将要关联的这个值。
+
+引申的插入写屏障，删除写屏障
+
+```go
+    writePointer(slot, ptr):  // 插入写屏障
+ 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+	  *slot = ptr
+
+  writePointer(slot, ptr)     // 删除写屏障
+  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
+  	*slot = ptr
+
+```
+
+   |........标记清扫阶段...........|
+STW begin                     STW end
+
+
+
+- 插入写屏障
+  - 栈上先STW然后标记完 + 新生成的对象都是黑色 + 堆上使用插入写屏障
+  - 堆上使用插入写屏障 + STW暂停，然后重新扫描一下栈
+- 删除写屏障
+  - 起始快照整栈跨找，扫黑，使得整个堆上的在用对象都处于灰色保护；
+    - 整栈扫黑，那么在用的堆上的对象是一定处于灰色堆对象的保护下的，之后配合堆对象删除写屏障就能保证在用对象不丢失。
+  - 加入插入写屏障的逻辑，C 指向 D 的时候，把 D 置灰，这样扫描也没问题。这样就能去掉起始 STW 扫描，从而可以并发，一个一个栈扫描。
+
+
+
+
+
+- hybrid write barrier
+```go
+writePointer(slot, ptr):
+    shade(*slot)
+    if current stack is grey:
+        shade(ptr)
+    *slot = ptr
+```
+- The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier).
+
+
+
+
+
+
+
+
+
+
+
+栈上是没有写屏障的，
+<堆与栈之间>或者<堆与堆>才会触发写屏障
+
+
+- 一个是插入写屏障
+  - 破坏第一个条件
+  - 记住插入，---黑色----白色===》 黑色----灰色
+    ```go
+    writePointer(slot, ptr):
+ 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+	  *slot = ptr
+	```
+
+---
+
+- 一个是删除写屏障
+  - 破坏第二个条件。
+  - 删除
+  ```go
+  writePointer(slot, ptr)
+  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
+  	*slot = ptr
+  ```
+  - disadvantage:
+    - which means that many stacks must be re-scanned during STW. The garbage collector first scans all stacks at the beginning of the GC cycle to collect roots.(第一次扫描所有的栈在收集根对象的时候，不能保证在栈后面不会有黑对象引用了白对象)
+
+---
+
+- 混合写屏障
+  - what: 混合写屏障为了**消除栈的重扫**过程.
+  ```go
+  writePointer(slot, ptr):
+      shade(*slot)
+      if current stack is grey:
+          shade(ptr)
+      *slot = ptr
+  ```
+  - why: 
+
+  - how: 通过几种方式来保证弱三色一致性
+    - STW 扫描一次协程栈(扫一个Goroutine栈就变为黑色) + 创建对象默认黑色
+      - 开启写屏障期间创建的所有对象默认都是黑色
+    - 混合写屏障 + 两Goroutine之间交流
+
+## golang实现
+
+
+
+
+https://docs.go101.org/std/src/runtime/mbarrier.go.html
+
+
+为什么gc也要扫描栈，不是都在堆上面吗？
+- 因为堆上的地址，可能保存在栈上某个变量里，所以需要扫描。
+
+
+
+---	
+>  - The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier). 混合写屏障的时候要求新对象被分配为黑色（这里我猜是所有的对象，栈对象，或者堆对象也好）
+>  - once a stack has been scanned and blackened, it remains black. 一旦栈被扫描（这个的扫描是第一次扫描，查找根对象的时候）和置为黑，那么它一直保持为黑
+>    - 说明栈在第一次扫描的时候就会把栈上对象置为黑色？
+>  - In the hybrid barrier, the two shades and the condition work together
+>    - shade(*slot): 从heap到stack移动白色对象，染为灰色。（尝试如果它试图从heap中解开一个对象的链接，就会对其进行遮挡。）
+>	  - shade(ptr): 从stack到一个黑色的heap对象。
+>	  - Once a goroutine's stack is black, the shade(ptr) becomes unnecessary. shade(ptr) prevents hiding an object by moving it from the stack to the heap, but this requires first having a pointer hidden on the stack. Immediately after a stack is scanned, it only points to shaded objects, so it's not hiding anything, and the shade(*slot) prevents it from hiding any other pointers on its stack.
+>  - 一个Goroutine写到另一个Goroutine:
+
+
+
+  ```
+  我就是觉得混合写屏障好像也没法 解决重新扫描栈的问题。我举个例子：
+  现在有 A, B, C三个对象，A(黑色，栈上)，B（灰色，栈上），C（白色，堆上）；
+  当前引用关系是：
+  A（黑） -> nil
+  B（灰） -> C（白）
+  现在应用程序赋值修改，把A指向C：
+  A（黑） -> C（白）
+  B（灰） -> nil
+  由于A，B是栈上的对象，栈上对象赋值这里可是没有写屏障的；那么岂不是黑色对象指向白色对象了，C会回收了，就悬挂指针了？？？
+  ```
+
+>   - Goroutine 栈扫描的过程需要 STW，所以你描述的这种状况是不存在的，**栈上的对象要么全白要么全黑**
+>     - 你说的“栈上的对象要么全白，要么全黑“ ，这个只是对一个 goroutine 栈来说的（golang 暂停业务扫描栈也是一个一个来的）。如果场景是 A 在 Goroutine1，B在Goroutine2呢？这种情况就是A是黑色，B是白色或者灰色。这样会不会就有我说的原本那个问题呢？
+>       - [The hybrid barrier assumes a goroutine cannot write to another goroutine's stack.(混合写屏障假设一个goroutine,不能写到另一个goroutine的栈)](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#channel-operations-and-go-statements)
+>     - 除了从一个Goroutine通过chan发送/生成一个新Goroutine
+>	      - 如果两个Goroutine 栈只要有一个是灰色的，那么就会有```shade(ptr)```
+>	      - 新生成的Goroutine栈都是黑色的（由前面的条件保证）,如果父Goroutine是灰色的，那么需使用```shade(ptr)```
+>  
+
+
+
+
+
+https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md
+
+
+---
 
 
 

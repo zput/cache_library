@@ -38,16 +38,22 @@
       - [reflect.Type](#reflecttype)
       - [reflect.Value](#reflectvalue)
 - [运行时:](#运行时)
+  - [并发编程](#并发编程)
+    - [同步原语](#同步原语)
+      - [内存顺序保证](#内存顺序保证)
+      - [sync包](#sync包)
+    - [context(上下文)](#context上下文)
   - [内存管理](#内存管理)
+    - [GC](#gc)
+    - [逃逸分析](#逃逸分析)
     - [内存泄漏](#内存泄漏)
+- [附录](#附录)
   - [0.方法](#0方法)
   - [1. new And make](#1-new-and-make)
     - [example](#example)
   - [2. 值类型和引用类型的区别](#2-值类型和引用类型的区别)
   - [3. 计算golang中类型的大小的方式](#3-计算golang中类型的大小的方式)
   - [golang的chan](#golang的chan)
-  - [4. golang中同步的方式](#4-golang中同步的方式)
-  - [5. golang逃逸分析](#5-golang逃逸分析)
 - [archive](#archive)
 
 <!-- /code_chunk_output -->
@@ -57,7 +63,7 @@
 
 > ''里面的是chan的状态(eg: 一个零值nil通道;一个非零值但已关闭的通道)
 >> '空'读写阻塞-关闭恐慌;
->> '关闭'读为0-关闭写恐慌. 如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数据
+>> '关闭'读为0-关闭写恐慌. 如果是有缓存的chan已关闭，且现在缓存不为空,读正常得到数据[<sup>1</sup>](#refer-anchor1)
 
 - 数据结构:
 	- string
@@ -81,8 +87,10 @@
 
 - 运行时:
 	- 并发编程
+		- 同步原语
+		  - 内存顺序保证
+          - sync包
 		- context(上下文)
-		- 同步原语(4.golang中同步的方式)
 		- 定时器
 		- GMP
 	- 内存管理
@@ -780,7 +788,223 @@ const 	flagKindMask    flag = 1<<flagKindWidth -
 
 ## 运行时:
 
+### 并发编程
+
+#### 同步原语
+
+- what:
+  - 并发同步是指如何控制若干并发计算（在Go中，即协程），从而
+    - 避免在它们之间产生数据竞争的现象；
+    - 避免在它们无所事事的时候消耗CPU资源。
+  - 并发同步有时候也称为数据同步。
+- why:
+  - 避免在它们之间产生数据竞争的现象；
+  - 避免在它们无所事事的时候消耗CPU资源。
+- how:
+  - 通道用例大全
+  - 如何优雅地关闭通道
+  - [sync标准库包中提供的并发同步技术](https://gfw.go101.org/article/concurrent-synchronization-more.html)
+    - sync.WaitGroup（等待组）类型: ：Add(delta int)、Done()和Wait()
+	- sync.Once类型: Do(f func())方法
+	  - 一个sync.Once值被用来确保一段代码在一个并发程序中被执行且仅被执行一次
+    - sync.Mutex（互斥锁）和sync.RWMutex（读写锁）类型: 实现了```sync.Locker```接口类型。 所以这两个类型都有两个方法：Lock()和Unlock()，
+	  - 用来保护一份数据不会被多个使用者同时读取和修改。
+	  - *sync.RWMutex类型还有两个另外的方法：RLock()和RUnlock()，
+	    - 用来支持多个读取者并发读取一份数据但防止此份数据被某个数据写入者和其它数据访问者（包括读取者和写入者）同时使用
+    - sync.Cond类型:提供了一种有效的方式来实现多个协程间的**通知**。
+	  - 成员： sync.Locker类型的名为L的字段
+	  - 成员函数： Wait()、Signal()和Broadcast()。
+	    - 每个Cond值维护着一个先进先出等待协程队列。 对于一个可寻址的Cond值c，
+		  - c.Wait()必须在c.L字段值的锁被成功获取的时候调用；否则，c.Wait()调用将造成一个恐慌。 一个c.Wait()调用将
+			- 1. 首先将当前协程入到c所维护的等待协程队列；
+			- 2. 然后调用c.L.Unlock()释放c.L的锁；
+			- 3. 然后使当前协程进入阻塞状态；（当前协程将被另一个协程通过c.Signal()或c.Broadcast()调用唤醒而重新进入运行状态。）
+			  - 一旦当前协程重新进入运行状态，c.L.Lock()将被调用以试图重新获取c.L字段值的锁。 此c.Wait()调用将在此试图成功之后退出。
+	      - 一个c.Signal()调用将唤醒并移除c所维护的等待协程队列中的第一个协程（如果此队列不为空的话）。
+		  - 一个c.Broadcast()调用将唤醒并移除c所维护的等待协程队列中的所有协程（如果此队列不为空的话）。
+
+  - [sync/atomic标准库包中提供的原子操作技术](https://gfw.go101.org/article/concurrent-atomic-operation.html)
+    - ```T```---可以换成--->内置```int32、int64、uint32、uint64和uintptr```类型
+	  ```go
+	  func AddT(addr *T, delta T)(new T)
+	  func LoadT(addr *T) (val T)
+	  func StoreT(addr *T, val T)
+	  func SwapT(addr *T, new T) (old T)
+	  func CompareAndSwapT(addr *T, old, new T) (swapped bool)
+	  ```
+  - 我们也可以利用网络和文件读写来做并发同步，但是这样的并发同步方法使用在一个程序进程内部时效率相对比较低。 一般来说，这样的方法多适用于多个进程之间或多个主机之间的并发同步。《Go语言101》中不介绍这样的并发同步方法。
+
+##### 内存顺序保证
+
+- Go中的内存顺序保证
+  - 内存顺序
+    - what: 调整指令执行顺序，从而使得指令执行顺序和代码中指定的顺序不太一致。 指令顺序也称为内存顺序。
+      - ![20201217193316](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217193316.png)
+	- why:
+	- how:
+	  - 通道操作相关的顺序保证:
+	    - 1. 一个通道上的第n次成功发送操作的开始发生在此通道上的第n次成功接收操作完成之前，无论此通道是缓冲的还是非缓冲的。
+		  - **如果是缓冲，一边是发送，数据进入到通道中，当另一边接收的时候，肯定在前一边之后。**
+		- 2. **一个容量为m通道上的第n次成功接收操作的开始发生在此通道上的第n+m次发送操作完成之前**。 特别地，如果此通道是非缓冲的（m == 0），则此通道上的第n次成功接收操作的开始发生在此通道上的第n次发送操作完成之前。
+		- 3. 一个通道的关闭操作发生在任何因为此通道被关闭而从此通道接收到了零值的操作完成之前。
+      - 事实上， 对一个非缓冲通道来说，其上的第n次成功发送的完成和其上的第n次成功接收的完成应被视为同一事件。
+	    - 好像他们就是保证当阻塞发送接收的时候，**他们可以当成一个事件，同时发生的。**
+      - example:
+	    - ![20201217195138](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217195138.png)
+
+##### sync包
+
+[sync.Map](goroutine/sync_map.go)
+
+1. sync.Map的核心实现 - 两个map，一个用于写，另一个用于读，这样的设计思想可以类比`缓存与数据库`
+2. sync.Map的局限性 - 如果写远高于读，dirty->readOnly 这个类似于 `刷数据` 的频率就比较高，不如直接用 `mutex + map` 的组合
+3. sync.Map的设计思想 - 保证高频读的无锁结构、空间换时间
+
+[sync.Cond](goroutine/sync_cond.go)
+
+1. sync.Cond的核心实现 - 通过一个锁，封装了`notify 通知`的实现，包括了`单个通知`与`广播`这两种方式
+2. sync.Cond与channel的异同 - channel应用于`一收一发`的场景，sync.Cond应用于`多收一发`的场景
+3. sync.Cond的使用探索 - 多从专业社区收集意见 https://github.com/golang/go/issues/21165
+
+[sync.Pool](goroutine/sync_pool.go)
+
+1. sync.Pool的核心作用 - 读源码，`缓存稍后会频繁使用的对象`+`减轻GC压力`
+2. sync.Pool的Put与Get - Put的顺序为`local private-> local shared`，Get的顺序为 `local private -> local shared -> remote shared`
+3. 思考sync.Pool应用的核心场景 - `高频使用且生命周期短的对象，且初始化始终一致`，如fmt
+4. 探索Go1.13引入`victim`的作用 - 了解`victim cache`的机制
+
+#### context(上下文)
+
+
+[<sup>2</sup>](#refer-anchor2)
+// TODO
+
 ### 内存管理
+
+#### GC
+#### 逃逸分析
+
+- what:
+  - 指针（或者引用）的逃逸(Escape): 当变量（或者对象）在方法中分配后，其指针有可能被返回或者被全局引用，这样就会被其他过程或者线程所引用.
+    - 逃逸分析: 是一种确定指针动态范围的方法，可以分析在程序的哪些地方可以访问到指针。
+	  - 必然发生逃逸:
+	    - 在某个函数中new或字面量创建出的变量，将其指针作为函数返回值，则该变量一定发生逃逸（构造函数返回的指针变量一定逃逸）；
+        - 被已经逃逸的变量引用的指针，一定发生逃逸；
+		```go
+        type User struct {
+        	Username string
+        	Password string
+        	Age      int
+        }
+        func main() {
+        	a := "aaa"
+        	u := &User{a, "123", 12}
+        	Call1(u)
+        }
+        func Call1(u *User) {
+        	fmt.Printf("%v",u)
+        }
+        /*
+        func Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+         	p := newPrinter()
+        	p.doPrintf(format, a)
+        ...
+        } 
+        func (p *pp) doPrintf(format string, a []interface{}) {
+        ...
+        p.printArg(a[argNum], rune(c))
+        ...
+        } 
+        func (p *pp) printArg(arg interface{}, verb rune) {
+        	p.arg = arg
+        	p.value = reflect.Value{}
+        ...
+        }
+        */
+
+        //-------------上面逃逸，下面没有------------------//
+
+        func main() {
+        	a := "aaa"
+        	u := &User{a, "123", 12}
+        	Call1(u)
+        }
+        func Call1(u *User) int {
+        	return Call2(u)
+        }
+        func Call2(u *User) int {
+        	return Call3(u)
+        }
+        func Call3(u *User) int {
+        	u.Username = "bbb"
+        	return u.Age * 20
+        }
+        /*
+        go run -gcflags "-m -l" main.go
+        # command-line-arguments
+        ./main.go:23:12: Call3 u does not escape
+        ./main.go:19:12: Call2 u does not escape
+        ./main.go:15:12: Call1 u does not escape
+        ./main.go:11:23: main &User literal does not escape
+        */
+		```
+        - 被指针类型的slice、map和chan引用的指针，一定发生逃逸；
+        ```go
+		func main() {
+        	a := make([]*int,1)
+        	b := 12
+        	a[0] = &b
+        
+        	c := make(map[string]*int)
+        	d := 14
+        	c["aaa"]=&d
+        
+        	e := make(chan *int,1)
+        	f := 15
+        	e <- &f
+		}
+		/*
+	    go run -gcflags "-m -l" main.go
+		# command-line-arguments
+        ./main.go:7:2: moved to heap: b
+        ./main.go:11:2: moved to heap: d
+        ./main.go:15:2: moved to heap: f
+        ./main.go:6:11: main make([]*int, 1) does not escape
+        ./main.go:10:11: main make(map[string]*int) does not escape
+		*/
+		```
+	  - 必然不会逃逸的情况：
+        - 指针被未发生逃逸的变量引用；
+        - 仅仅在函数内对变量做取址操作，而未将指针传出；
+      - 可能发生逃逸，也可能不会发生逃逸：
+        - 将指针作为入参传给别的函数；这里还是要看指针在被传入的函数中的处理过程，如果发生了上边的三种情况，则会逃逸；否则不会逃逸；
+
+- why:
+  - gc压力
+    ```go
+    //我：“golang函数传参是不是应该跟c一样，尽量不要直接传结构体，而要传结构体指针？“
+    //leader：“不对，咱们项目很多都是直接传结构体的。“
+    //我：“那样不会造成不必要的内存copy开销吗？”
+    //leader：“确实会有，但这样可以减小gc压力，因为传值会在栈上分配，而一旦传指针，结构体就会逃逸到堆上。“
+    ```
+  - 不逃逸的对象放栈上，可能逃逸的放堆上:
+    - gc的压力: 最大的好处应该是减少gc的压力，不逃逸的对象分配在栈上，当函数返回时就回收了资源，不需要gc标记清除。
+    - 因为逃逸分析完后可以确定哪些变量可以分配在栈上，栈的分配比堆快，性能好
+  - 同步消除，如果你定义的对象的方法上有同步锁，但在运行时，却只有一个线程在访问，此时逃逸分析后的机器码，会去掉同步锁运行。
+- how:
+  - ```-gcflags '-m -l'```	 
+  - ![20201217210216](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217210216.png)
+    - 从内部函数开始分析，它的好处的是，如果底部的函数中都没有逃逸，那么最上层的变量就直接放入栈里面就行了，不需要放堆里。
+	  - 这里的objS没有逃逸，而m却逃逸了，这是因为go的逃逸分析不知道objS和m的关系，逃逸分析不知道参数M是```struct S```的一个成员，所以只能把它分配给堆。
+
+[Golang逃逸分析](https://cloud.tencent.com/developer/article/1165660)
+[GoLang-逃逸分析](https://www.jianshu.com/p/ad9dbc81a0aa)
+
+
+https://zhuanlan.zhihu.com/p/91559562
+
+
+
 #### 内存泄漏
 
 - what:
@@ -899,15 +1123,26 @@ https://segmentfault.com/a/1190000019222661
 https://gfw.go101.org/article/memory-leaking.html
 
 
+## 附录
+
+
+<div id="refer-anchor1"></div>
+
+[1] [go101](https://gfw.go101.org/article/101.html)
+
+<div id="refer-anchor2"></div>
+
+[2] [code_reading](https://github.com/Junedayday/code_reading)
+
+<div id="refer-anchor3"></div>
+
+[3] [Go 语言设计与实现](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)
 
 
 
-
-
-
-
-
-
+---
+---
+---
 
 
 
@@ -1254,193 +1489,6 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 
 
 
-
-
-### 4. golang中同步的方式
-
-- what:
-  - 并发同步是指如何控制若干并发计算（在Go中，即协程），从而
-    - 避免在它们之间产生数据竞争的现象；
-    - 避免在它们无所事事的时候消耗CPU资源。
-  - 并发同步有时候也称为数据同步。
-- why:
-  - 避免在它们之间产生数据竞争的现象；
-  - 避免在它们无所事事的时候消耗CPU资源。
-- how:
-  - 通道用例大全
-  - 如何优雅地关闭通道
-  - [sync标准库包中提供的并发同步技术](https://gfw.go101.org/article/concurrent-synchronization-more.html)
-    - sync.WaitGroup（等待组）类型: ：Add(delta int)、Done()和Wait()
-	- sync.Once类型: Do(f func())方法
-	  - 一个sync.Once值被用来确保一段代码在一个并发程序中被执行且仅被执行一次
-    - sync.Mutex（互斥锁）和sync.RWMutex（读写锁）类型: 实现了```sync.Locker```接口类型。 所以这两个类型都有两个方法：Lock()和Unlock()，
-	  - 用来保护一份数据不会被多个使用者同时读取和修改。
-	  - *sync.RWMutex类型还有两个另外的方法：RLock()和RUnlock()，
-	    - 用来支持多个读取者并发读取一份数据但防止此份数据被某个数据写入者和其它数据访问者（包括读取者和写入者）同时使用
-    - sync.Cond类型:提供了一种有效的方式来实现多个协程间的**通知**。
-	  - 成员： sync.Locker类型的名为L的字段
-	  - 成员函数： Wait()、Signal()和Broadcast()。
-	    - 每个Cond值维护着一个先进先出等待协程队列。 对于一个可寻址的Cond值c，
-		  - c.Wait()必须在c.L字段值的锁被成功获取的时候调用；否则，c.Wait()调用将造成一个恐慌。 一个c.Wait()调用将
-			- 1. 首先将当前协程入到c所维护的等待协程队列；
-			- 2. 然后调用c.L.Unlock()释放c.L的锁；
-			- 3. 然后使当前协程进入阻塞状态；（当前协程将被另一个协程通过c.Signal()或c.Broadcast()调用唤醒而重新进入运行状态。）
-			  - 一旦当前协程重新进入运行状态，c.L.Lock()将被调用以试图重新获取c.L字段值的锁。 此c.Wait()调用将在此试图成功之后退出。
-	      - 一个c.Signal()调用将唤醒并移除c所维护的等待协程队列中的第一个协程（如果此队列不为空的话）。
-		  - 一个c.Broadcast()调用将唤醒并移除c所维护的等待协程队列中的所有协程（如果此队列不为空的话）。
-
-  - [sync/atomic标准库包中提供的原子操作技术](https://gfw.go101.org/article/concurrent-atomic-operation.html)
-    - ```T```---可以换成--->内置```int32、int64、uint32、uint64和uintptr```类型
-	  ```go
-	  func AddT(addr *T, delta T)(new T)
-	  func LoadT(addr *T) (val T)
-	  func StoreT(addr *T, val T)
-	  func SwapT(addr *T, new T) (old T)
-	  func CompareAndSwapT(addr *T, old, new T) (swapped bool)
-	  ```
-  - 我们也可以利用网络和文件读写来做并发同步，但是这样的并发同步方法使用在一个程序进程内部时效率相对比较低。 一般来说，这样的方法多适用于多个进程之间或多个主机之间的并发同步。《Go语言101》中不介绍这样的并发同步方法。
-
-
-为了更好地理解各种并发同步技术，推荐在适当的时候（具有一定的Go并发编程经验时）阅读Go中的内存顺序保证一文。
-
-- Go中的内存顺序保证
-  - 内存顺序
-    - what: 调整指令执行顺序，从而使得指令执行顺序和代码中指定的顺序不太一致。 指令顺序也称为内存顺序。
-      - ![20201217193316](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217193316.png)
-	- why:
-	- how:
-	  - 通道操作相关的顺序保证:
-	    - 1. 一个通道上的第n次成功发送操作的开始发生在此通道上的第n次成功接收操作完成之前，无论此通道是缓冲的还是非缓冲的。
-		  - **如果是缓冲，一边是发送，数据进入到通道中，当另一边接收的时候，肯定在前一边之后。**
-		- 2. **一个容量为m通道上的第n次成功接收操作的开始发生在此通道上的第n+m次发送操作完成之前**。 特别地，如果此通道是非缓冲的（m == 0），则此通道上的第n次成功接收操作的开始发生在此通道上的第n次发送操作完成之前。
-		- 3. 一个通道的关闭操作发生在任何因为此通道被关闭而从此通道接收到了零值的操作完成之前。
-      - 事实上， 对一个非缓冲通道来说，其上的第n次成功发送的完成和其上的第n次成功接收的完成应被视为同一事件。
-	    - 好像他们就是保证当阻塞发送接收的时候，**他们可以当成一个事件，同时发生的。**
-      - example:
-	    - ![20201217195138](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217195138.png)
-
-
-
-### 5. golang逃逸分析
-
-- what:
-  - 指针（或者引用）的逃逸(Escape): 当变量（或者对象）在方法中分配后，其指针有可能被返回或者被全局引用，这样就会被其他过程或者线程所引用.
-    - 逃逸分析: 是一种确定指针动态范围的方法，可以分析在程序的哪些地方可以访问到指针。
-	  - 必然发生逃逸:
-	    - 在某个函数中new或字面量创建出的变量，将其指针作为函数返回值，则该变量一定发生逃逸（构造函数返回的指针变量一定逃逸）；
-        - 被已经逃逸的变量引用的指针，一定发生逃逸；
-		```go
-        type User struct {
-        	Username string
-        	Password string
-        	Age      int
-        }
-        func main() {
-        	a := "aaa"
-        	u := &User{a, "123", 12}
-        	Call1(u)
-        }
-        func Call1(u *User) {
-        	fmt.Printf("%v",u)
-        }
-        /*
-        func Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
-         	p := newPrinter()
-        	p.doPrintf(format, a)
-        ...
-        } 
-        func (p *pp) doPrintf(format string, a []interface{}) {
-        ...
-        p.printArg(a[argNum], rune(c))
-        ...
-        } 
-        func (p *pp) printArg(arg interface{}, verb rune) {
-        	p.arg = arg
-        	p.value = reflect.Value{}
-        ...
-        }
-        */
-
-        //-------------上面逃逸，下面没有------------------//
-
-        func main() {
-        	a := "aaa"
-        	u := &User{a, "123", 12}
-        	Call1(u)
-        }
-        func Call1(u *User) int {
-        	return Call2(u)
-        }
-        func Call2(u *User) int {
-        	return Call3(u)
-        }
-        func Call3(u *User) int {
-        	u.Username = "bbb"
-        	return u.Age * 20
-        }
-        /*
-        go run -gcflags "-m -l" main.go
-        # command-line-arguments
-        ./main.go:23:12: Call3 u does not escape
-        ./main.go:19:12: Call2 u does not escape
-        ./main.go:15:12: Call1 u does not escape
-        ./main.go:11:23: main &User literal does not escape
-        */
-		```
-        - 被指针类型的slice、map和chan引用的指针，一定发生逃逸；
-        ```go
-		func main() {
-        	a := make([]*int,1)
-        	b := 12
-        	a[0] = &b
-        
-        	c := make(map[string]*int)
-        	d := 14
-        	c["aaa"]=&d
-        
-        	e := make(chan *int,1)
-        	f := 15
-        	e <- &f
-		}
-		/*
-	    go run -gcflags "-m -l" main.go
-		# command-line-arguments
-        ./main.go:7:2: moved to heap: b
-        ./main.go:11:2: moved to heap: d
-        ./main.go:15:2: moved to heap: f
-        ./main.go:6:11: main make([]*int, 1) does not escape
-        ./main.go:10:11: main make(map[string]*int) does not escape
-		*/
-		```
-	  - 必然不会逃逸的情况：
-        - 指针被未发生逃逸的变量引用；
-        - 仅仅在函数内对变量做取址操作，而未将指针传出；
-      - 可能发生逃逸，也可能不会发生逃逸：
-        - 将指针作为入参传给别的函数；这里还是要看指针在被传入的函数中的处理过程，如果发生了上边的三种情况，则会逃逸；否则不会逃逸；
-
-- why:
-  - gc压力
-    ```go
-    //我：“golang函数传参是不是应该跟c一样，尽量不要直接传结构体，而要传结构体指针？“
-    //leader：“不对，咱们项目很多都是直接传结构体的。“
-    //我：“那样不会造成不必要的内存copy开销吗？”
-    //leader：“确实会有，但这样可以减小gc压力，因为传值会在栈上分配，而一旦传指针，结构体就会逃逸到堆上。“
-    ```
-  - 不逃逸的对象放栈上，可能逃逸的放堆上:
-    - gc的压力: 最大的好处应该是减少gc的压力，不逃逸的对象分配在栈上，当函数返回时就回收了资源，不需要gc标记清除。
-    - 因为逃逸分析完后可以确定哪些变量可以分配在栈上，栈的分配比堆快，性能好
-  - 同步消除，如果你定义的对象的方法上有同步锁，但在运行时，却只有一个线程在访问，此时逃逸分析后的机器码，会去掉同步锁运行。
-- how:
-  - ```-gcflags '-m -l'```	 
-  - ![20201217210216](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20201217210216.png)
-    - 从内部函数开始分析，它的好处的是，如果底部的函数中都没有逃逸，那么最上层的变量就直接放入栈里面就行了，不需要放堆里。
-	  - 这里的objS没有逃逸，而m却逃逸了，这是因为go的逃逸分析不知道objS和m的关系，逃逸分析不知道参数M是```struct S```的一个成员，所以只能把它分配给堆。
-
-[Golang逃逸分析](https://cloud.tencent.com/developer/article/1165660)
-[GoLang-逃逸分析](https://www.jianshu.com/p/ad9dbc81a0aa)
-
-
-https://zhuanlan.zhihu.com/p/91559562
 
 
 
