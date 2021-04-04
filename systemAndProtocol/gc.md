@@ -132,19 +132,108 @@ STW begin                     STW end
 
 
 
+- STW扫描的位置点,是在开始扫描还是在最后来一次扫描?
+- STW扫描可以按照每个goroutine的方式来一个个扫描? 不必一次暂停所有goroutine栈
+- 写屏障的类型
+  - 插入写屏障
+  - 删除写屏障
+  - 混合写屏障
+- 创建的新对象是黑色还是白色?
+
 - 插入写屏障
   - 栈上先STW然后标记完 + 新生成的对象都是黑色 + 堆上使用插入写屏障
   - 堆上使用插入写屏障 + STW暂停，然后重新扫描一下栈
+
+
+- 防止类型就是:
+  - heap_black_object -> heap_white_object
+  - stack_black_object -> heap_white_object
+
+STW goroutine栈扫描: 栈上对象都变成黑色,一些堆对象(与栈对联直连)为灰色,其他的为白色.
+// TODO picture 
+
+
+```sh
+/**************(1)**************/ 
+{
+  STW全栈扫描
+  堆上使用插入写屏障 | [创建新对象为黑色]
+}
+
+/**************(2)**************/ 
+{
+  STW goroutine栈扫描
+  堆上使用插入写屏障 | [创建新对象为黑色]
+}
+
+/**************(3)**************/ 
+{
+  堆上使用插入写屏障 | [创建新对象为可以为白色,也可以为黑色]
+  STW全栈扫描
+}
+
+/**************(4)**************/ 
+{
+  堆上使用插入写屏障 | [创建新对象为可以为白色,也可以为黑色]
+  STW goroutine栈扫描
+}
+```
+
+(1)(2)不行,如图:
+![20210404172432](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210404172432.png)
+
+
+
+(3)可以,1.5到1.7就是使用的这种方式
+(4)没必要了,都是最后STW,重新扫描一次灰色的goroutine栈
+
+
+
+
 - 删除写屏障
   - 起始快照整栈跨找，扫黑，使得整个堆上的在用对象都处于灰色保护；
     - 整栈扫黑，那么在用的堆上的对象是一定处于灰色堆对象的保护下的，之后配合堆对象删除写屏障就能保证在用对象不丢失。
   - 加入插入写屏障的逻辑，C 指向 D 的时候，把 D 置灰，这样扫描也没问题。这样就能去掉起始 STW 扫描，从而可以并发，一个一个栈扫描。
+```sh
+/**************(1)**************/ 
+{
+  STW全栈扫描
+  堆上使用删除写屏障 | [创建新对象为黑色]
+}
 
+/**************(2)**************/ 
+{
+  STW goroutine栈扫描
+  堆上使用删除写屏障 | [创建新对象为黑色]
+}
 
+/**************(3)**************/ 
+{
+  堆上使用删除写屏障 | [创建新对象为可以为白色/黑色]
+  STW全栈扫描
+}
 
+/**************(4)**************/ 
+{
+  堆上使用删除写屏障 | [创建新对象为可以为白色/黑色]
+  STW goroutine栈扫描
+}
+```
+
+(1)可以
+(2)不行,如图:
+![20210404172300](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210404172300.png)
+
+(3)(4)的话,因为是最后进行栈重新扫描,可以知道不会出现```stack_black_object -> heap_white_object```这种情况.
+如图:
+// TODO 
 
 
 - hybrid write barrier
+
+> 由前面的删除写屏障(2),我们只要加上插入写屏障就能避免出现隐藏白色对象这种情况.
+>> 这个也是```if current stack is grey:```的由来.
+
 ```go
 writePointer(slot, ptr):
     shade(*slot)
@@ -158,7 +247,26 @@ writePointer(slot, ptr):
 
 
 
+- [其他的变种:](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#alternative-barrier-approaches)
 
+```go
+
+writePointer(slot, ptr):
+    shade(*slot)
+    shade(ptr)
+    *slot = ptr
+
+writePointer(slot, ptr):
+    shade(*slot)
+    if any stack is grey:
+        shade(ptr)
+    *slot = ptr
+    
+writePointer(slot, ptr):
+    shade(*slot)
+    *slot = ptr
+
+```
 
 
 
