@@ -242,25 +242,64 @@ type T1 struct {
 
 ### chan
 
+- what: 从外部看进来.
+  - 不要通过共享内存的方式进行通信，而是应该通过通信的方式共享内存(**即通信顺序进程（Communicating sequential processes，CSP）**)
+  ```
+  |thread A|--------[memory]--------|thread B|
+  |goroutine A|-----[channel]-------|goroutine B|
+  ```
+  - 先进先出```（FIFO：first in first out）```数据队列
+    - 可以把一个通道看作是在一个程序内部的一个先进先出（FIFO：first in first out）数据队列。 一些协程可以向此通道发送数据，另外一些协程可以从此通道接收数据。
+  - 有锁管道
+    - Channel是一个用于同步和通信的有锁队列，使用互斥锁解决程序中可能存在的线程竞争问题是很常见的，我们能很容易地实现有锁队列。
+	- CAS实现的无锁Channel没有提供先进先出的特性，所以该提案暂时也被搁浅了.
 
-```go
-type hchan struct {
-    qcount   uint           // - 数组长度，即已有元素个数
-    dataqsiz uint           // - 数组容量，即可容纳元素个数
-    buf      unsafe.Pointer // - 数组地址
-    elemsize uint16         // - 元素大小
-    closed   uint32
-    elemtype *_type // 元素类型 golang运行时中，内存复制、垃圾回收等机制依赖数据的类型信息，所以hchan中还要有一个指针，指向元素类型的类型元数据
-    sendx    uint   // - 下一次写下标位置
-    recvx    uint   // - 下一次读下标位置
-    recvq    waitq  // 读等待队列
-    sendq    waitq  // 写等待队列
-    lock     mutex
-}
-```
+- why: 内部结构细节.
+  - 结构
+  ![20210410202252](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210410202252.png)
+  ```go
+  type hchan struct {
+      qcount   uint           // - 数组长度，即已有元素个数
+      dataqsiz uint           // - 数组容量，即可容纳元素个数
+      buf      unsafe.Pointer // - 数组地址
+      elemsize uint16         // - 元素大小
+      closed   uint32
+      elemtype *_type // 元素类型 golang运行时中，内存复制、垃圾回收等机制依赖数据的类型信息，所以hchan中还要有一个指针，指向元素类型的类型元数据
+      sendx    uint   // - 下一次写下标位置
+      recvx    uint   // - 下一次读下标位置
+      recvq    waitq  // 读等待队列
+      sendq    waitq  // 写等待队列
+      lock     mutex
+  }
 
-> 前面有```-```的就是无缓冲chan不需要的字段。
+  type waitq struct {
+    first *sudog
+    last  *sudog
+  }
+  ```
+  > 前面有```-```的就是无缓冲chan不需要的字段。
+  > [sudog](https://github.com/golang/go/blob/41d8e61a6b9d8f9db912626eb2bbc535e929fefc/src/runtime/runtime2.go#L345)
 
+
+
+
+
+- how: chan的实践，一般用它来干什么？
+  - 五种操作：
+    - ```close(ch)```
+	- ```ch <- v```
+	- ```<-ch```
+	  - ```v = <-ch```
+	  - ```v, sentBeforeClosed = <-ch```
+    - ```cap(ch)```
+    - ```len(ch)```
+
+https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-channel/#fnref:12
+
+https://docs.google.com/presentation/d/1EUOK5qZBdzKTUGbI3iMhHnhwI60pVsg8ISm3jB1D_K8/edit#slide=id.g138e72fb17_0_0
+
+https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/#select-
+https://docs.google.com/presentation/d/18_9LcMc8u93aITZ6DqeUfRvOcHQYj2gwxhskf0XPX2U/edit#slide=id.g5ea99f63e9_0_26
 
 ### error.Unwrap
 
@@ -876,7 +915,7 @@ const 	flagKindMask    flag = 1<<flagKindWidth -
 #### context(上下文)
 
 
-[<sup>2</sup>](#refer-anchor2)
+[<sup>1</sup>](#refer-anchor2)
 // TODO
 
 ### 内存管理
