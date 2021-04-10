@@ -1,67 +1,95 @@
 
-what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P"用来调度goruntine，被称为"GMP模型”。
 
-why:
 
-- 单进程时代不需要调度器
-  - 1.单一的执行流程，计算机只能一个任务一个任务处理。
-  - 2.进程阻塞所带来的CPU时间浪费。
-
-- 多进程/线程时代有了调度器需求
-  - 1.解决了阻塞的问题
-  - 2.CPU有很大的一部分都被浪费在进程调度
-  - 设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。
-
-- 协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)
-
-> - 为什么。
->   - 线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。
->   - Go调度器可以做出只在它知道内存是一致的点进行调度的决定。
-> - 如何进行调度。
->   - 一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。
->   - 另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。
->   - M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。
-> - 摆脱上下文(在这里P就是上下文)？
->   - ~~不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。~~
->   - 以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？  
-
-> - why:
->   - threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.
->   - Go调度器可以做出只在它知道内存是一致的点进行调度的决定。
-> - how:
->   - One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.
->   - Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.
->   -  M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.
-> - get rid of contexts?
->   - Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.
+- 202104月总结
+  - 没有按照what，why, how顺序来说:
+    - what里面没有阐述G，M，P的实际是什么.
+    - why里面没有把握**调度**这个思想.
+      - 单进程里面**不需要**调度，但是可能进程阻塞。
+      - 多线程**需要调度**，解决了阻塞，
+        - 但是调度在内核态，调度花费时间长，
+        - 线程笨重，有自己的信号掩码，。。。// TODO
+      - 用户态调度，**需要调度**, 比如协程，goroutine.
+        - 由协程与系统线程的关联比例，可以分为```[1 : N] [N : 1] [M : N]```.
+    - how里面要点出主旨：把大量的goroutine高效的分配给少量的系统线程。
+      - 二个策略：
+        - 压榨系统线程：
+          - M执行P队列中的G完了，不让它销毁或者停止，从别的地方拿
+          - 当陷入系统调用中，让M-G关联，P重新拿一个M执行剩下的G.
+        - P的策略，可控制程序的并行数量，[与实际机器的CPU核数]
+      - 两个小策略：
+        - 防止饥饿；
+        - 保留一个全局P，当局部P满了，可以放入全局P中。
 
 ---
 
 
->这个也就说明了```N-M```的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。
->>每个系统线程都有一个唯一的m0, g0与之对应，想想为什么？(g0的栈空间与其他的不同，它是放在系统线程的栈空间，**应该是进程的栈空间？**TODO,线程的栈空间)
->>>每个线程有自己的栈空间(而这个g0就在这个栈上)。但是是与其他的线程公用的~~代码段~~，**数据段，堆空间**,
->>>>所以当创建其他的goroutine的时候，把它的协裎栈在堆上，所以它可以被其他的M调用。
+- what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P"用来调度goruntine，被称为"GMP模型”。
+  - GMP
+    - G:为了调度方便，保存寄存器，栈地址等->```对应cpu切换[1.cpu寄存器的值；2.stack地址]```
+    - M:与系统线程一一对应
+    - P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。
 
+- why:
 
-how:
-
-- Go调度本质是把大量的goroutine分配到少量线程上去执行，并利用多核并行，实现更强大的并发。
-  - 通过这一点去记住，把大量goroutine分配到小量线程去尽快执行
-    - 复用
-    - 并发
-    - 防止饥饿
-    - 
-
-> - 调度器的有两大思想：[<sup>1</sup>](#zxc-anchor-1)
->   - 复用线程：协程本身就是运行在一组线程之上，不需要频繁的创建、销毁线程，而是对线程的复用。在调度器中复用线程还有2个体现：
->     - **work stealing**，当本线程无可运行的G时，尝试从其他线程绑定的P偷取G，而不是销毁线程。
->     - **hand off**，当本线程因为G进行系统调用阻塞时，线程释放绑定的P，把P转移给其他空闲的线程执行。
->   - 利用并行：GOMAXPROCS设置P的数量，当GOMAXPROCS大于1时，就最多有GOMAXPROCS个线程处于运行状态，**这些线程可能分布在多个CPU核上同时运行**，使得并发利用并行。另外，GOMAXPROCS也限制了并发的程度，比如GOMAXPROCS = 核数/2，则最多利用了一半的CPU核进行并行。
->     - golang并发和并行：Rob Pike一直在强调Go是并发，不是并行，因为Go做的是在一段时间内完成几十万、甚至几百万的工作，而不是同一时间同时在做大量的工作。并发可以利用并行提高效率，调度器是有并行设计的。
-> - 调度器的两小策略：
->   - 抢占：在coroutine中要等待一个协程主动让出CPU才执行下一个协程，在Go中，一个goroutine最多占用CPU 10ms，防止其他goroutine被饿死，**这就是goroutine不同于coroutine的一个地方**。
->   - 全局G队列：在新的调度器中依然有全局G队列，但功能已经被弱化了，当M执行work stealing从其他P偷不到G时，它可以从全局G队列获取G。
+  - 单进程时代不需要调度器
+    - 1.单一的执行流程，计算机只能一个任务一个任务处理。
+    - 2.进程阻塞所带来的CPU时间浪费。
+  
+  - 多进程/线程时代有了调度器需求
+    - 1.解决了阻塞的问题
+    - 2.CPU有很大的一部分都被浪费在进程调度
+    - 设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。
+  
+  - 协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)
+  
+  > - 为什么。
+  >   - 线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。
+  >   - Go调度器可以做出只在它知道内存是一致的点进行调度的决定。
+  > - 如何进行调度。
+  >   - 一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。
+  >   - 另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。
+  >   - M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。
+  > - 摆脱上下文(在这里P就是上下文)？
+  >   - ~~不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。~~
+  >   - 以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？  
+  
+  > - why:
+  >   - threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.
+  >   - Go调度器可以做出只在它知道内存是一致的点进行调度的决定。
+  > - how:
+  >   - One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.
+  >   - Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.
+  >   -  M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.
+  > - get rid of contexts?
+  >   - Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.
+  
+  ---
+  
+  
+  >这个也就说明了```N-M```的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。
+  >>每个系统线程都有一个唯一的m0, g0与之对应，想想为什么？(g0的栈空间与其他的不同，它是放在系统线程的栈空间，**应该是进程的栈空间？**TODO,线程的栈空间)
+  >>>每个线程有自己的栈空间(而这个g0就在这个栈上)。但是是与其他的线程公用的~~代码段~~，**数据段，堆空间**,
+  >>>>所以当创建其他的goroutine的时候，把它的协裎栈在堆上，所以它可以被其他的M调用。
+  
+- how:
+  
+  - Go调度本质是把**大量的goroutine分配到少量系统线程**上去执行，并利用多核并行，实现更强大的并发。
+    - 通过这一点去记住，把大量goroutine分配到小量线程去尽快执行
+      - 复用
+      - 并发
+      - 防止饥饿
+      - 全局G
+  
+  > - 调度器的有两大思想：[<sup>1</sup>](#zxc-anchor-1)
+  >   - **压榨系统线程**：协程本身就是运行在一组线程之上，不需要频繁的创建、销毁线程，而是对线程的复用。在调度器中复用线程还有2个体现：
+  >     - **work stealing(*不让它休息*)**，当本线程无可运行的G时，尝试从其他线程绑定的P偷取G，而不是销毁线程。
+  >     - **hand off(*阻塞了，那就换一个压榨*)**，当本线程因为G进行系统调用阻塞时，线程释放绑定的P，把P转移给其他空闲的线程执行。
+  >   - **利用并行**：GOMAXPROCS设置P的数量，当GOMAXPROCS大于1时，就最多有GOMAXPROCS个线程处于运行状态，**这些线程可能分布在多个CPU核上同时运行**，使得并发利用并行。另外，GOMAXPROCS也限制了并发的程度，比如GOMAXPROCS = 核数/2，则最多利用了一半的CPU核进行并行。
+  >     - golang并发和并行：Rob Pike一直在强调Go是并发，不是并行，因为Go做的是在一段时间内完成几十万、甚至几百万的工作，而不是同一时间同时在做大量的工作。并发可以利用并行提高效率，调度器是有并行设计的。
+  > - 调度器的两小策略：
+  >   - 抢占：在coroutine中要等待一个协程主动让出CPU才执行下一个协程，在Go中，一个goroutine最多占用CPU 10ms，防止其他goroutine被饿死，**这就是goroutine不同于coroutine的一个地方**。
+  >   - 全局G队列：在新的调度器中依然有全局G队列，但功能已经被弱化了，当M执行work stealing从其他P偷不到G时，它可以从全局G队列获取G。
 
 
 

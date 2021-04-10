@@ -437,6 +437,9 @@ https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md
 
 ### 内存分配器
 
+
+![20210408201124](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210408201124.png)
+
 ![gc_heap](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/gc_heap.png)
 
 ```go
