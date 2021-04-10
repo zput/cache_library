@@ -5,9 +5,15 @@
 <!-- code_chunk_output -->
 
 - [理论](#理论)
+  - [About GC](#about-gc)
   - [三色](#三色)
   - [新分配对象的颜色](#新分配对象的颜色)
   - [写屏障](#写屏障)
+    - [写屏障的步骤推导](#写屏障的步骤推导)
+      - [插入写屏障](#插入写屏障)
+      - [删除写屏障](#删除写屏障)
+      - [混合写屏障](#混合写屏障)
+      - [其他的变种](#其他的变种httpsgithubcomgolangproposalblobmasterdesign17503-eliminate-rescanmdalternative-barrier-approaches)
 - [golang实现](#golang实现)
 - [扩展](#扩展)
   - [mutator?](#mutator)
@@ -22,12 +28,23 @@
   - [内存分配器](#内存分配器)
     - [heapArena](#heaparena)
     - [span](#span)
+- [archive](#archive)
 
 <!-- /code_chunk_output -->
 
 
+---
+
+- 202104-conclusion
+  - what,why,how
+
+
+---
 
 ## 理论
+
+
+### About GC
 
 > ### what:
 
@@ -59,46 +76,41 @@
   - 读屏障：非移动式垃圾回收器中，天然不需要读屏障。
   - 写屏障：会在写操作中插入指令，把数据对象的修改通知到垃圾回收器。
     - 插入写屏障：
-	```
-	writePointer(slot, ptr):
-   	 	shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
-    	*slot = ptr
-	```
-	- 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。
-	```
-	writePointer(slot, ptr)
-    	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色
-    	*slot = ptr
-	```
-	- conflict: 只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，代价太大。为了改善这个问题，改为**忽略协程栈**上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。
-		- 混合写屏障：将被覆盖的对象(老对象)标记成灰色并在当前栈没有扫描时将新对象也标记成灰色。
-		```
-		 writePointer(slot, ptr):
-    		shade(*slot) //将老对象标记为灰色。
-  			if current stack is grey: // The insertion part of the barrier is necessary while the calling goroutine's stack is grey.
-   		    	shade(ptr)
-  			*slot = ptr
-		```
-		- 既可**忽略当前栈帧的写屏障**。(不管是插入写屏障，还是删除写屏障.)
-          - 这里模拟很容易，黑色关联白色，且没有其他灰色关联这个黑色；就会出现hiding object。
-            - 模拟heap上触发**删除写屏障**。---》所以stack上一个black object关联heap上面的white object；这时候heap上的其他颜色object断开与它的连接。
-            - 模拟heap上触发**插入写屏障**。
-              - ![gc](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/gc.png)
-		- 又不需要在第二次STW的时，重新扫描所有活跃G的栈帧。
-
-堆（heap）上面的都有插入写屏障，不会发生hiding object。
+    ```
+    writePointer(slot, ptr):
+      	shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+       	*slot = ptr
+    ```
+	  - 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。
+	  ```
+	  writePointer(slot, ptr)
+      	shade(*slot) //shade函数尝试改变指针的颜色-->改变(*slot)的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
+      	*slot = ptr
+	  ```
+	  - conflict: 只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，代价太大。为了改善这个问题，改为**忽略协程栈**上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。
+	  	- 混合写屏障：将被覆盖的对象(老对象)标记成灰色并在当前栈没有扫描时将新对象也标记成灰色。
+	  	```
+	  	 writePointer(slot, ptr):
+          shade(*slot) //将老对象标记为灰色。
+          if current stack is grey: // The insertion part of the barrier is necessary while the calling goroutine's stack is grey.
+              shade(ptr)
+          *slot = ptr
+	  	```
+	  	- 既可**忽略当前栈帧的写屏障**。(不管是插入写屏障，还是删除写屏障.)
+            - 这里模拟很容易，黑色关联白色，且没有其他灰色关联这个黑色；就会出现hiding object。
+              - 模拟heap上触发**删除写屏障**。---》所以stack上一个black object关联heap上面的white object；这时候heap上的其他颜色object断开与它的连接。
+              - 模拟heap上触发**插入写屏障**。
+                - ![gc](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/gc.png)
+	  	- 又不需要在第二次STW的时，重新扫描所有活跃G的栈帧。
 
 
 
 ### 三色
 
-
-
 ### 新分配对象的颜色
 
 黑色赋值器：已经由回收器扫描过，不会再次对其进行扫描。
 灰色赋值器：尚未被回收器扫描过，或尽管已经扫描过但仍需要重新扫描。
-
 
 如果新分配的对象为黑色或者灰色，则赋值器直接将其视为无需回收的对象，写入堆中；
 如果新分配的对象为白色，则可以避免无意义的新对象保留到下一个垃圾回收的周期。
@@ -107,7 +119,7 @@
 
 ### 写屏障
 
-背景：如果对栈和堆都执行写屏障(不管是插入写屏障，还是删除写屏障)，那么按照三色原则，插入写屏障使它不满足强三色不变式，删除写屏障使它一定不满足弱三色不变式。但是基于性能考虑，栈上不触发写屏障。
+背景：如果对栈和堆都执行写屏障(不管是插入写屏障，还是删除写屏障)，那么按照三色原则，插入写屏障使它不满足强三色不变式，删除写屏障使它一定不满足弱三色不变式。两种写屏障都不会错误回收。**但是基于性能考虑，栈上不触发写屏障。**
 
 - ```writePointer(slot, ptr):```
   - ```*slot```可能是null。
@@ -118,39 +130,42 @@
 
 ```go
     writePointer(slot, ptr):  // 插入写屏障
- 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
-	  *slot = ptr
+      shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+      *slot = ptr
 
-  writePointer(slot, ptr)     // 删除写屏障
-  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
-  	*slot = ptr
-
+    writePointer(slot, ptr)     // 删除写屏障
+      shade(*slot) //shade函数尝试改变指针的颜色-->改变(*slot)的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
+      *slot = ptr
 ```
 
+#### 写屏障的步骤推导
+
+```
    |........标记清扫阶段...........|
 STW begin                     STW end
+```
 
-
-
-- STW扫描的位置点,是在开始扫描还是在最后来一次扫描?
-- STW扫描可以按照每个goroutine的方式来一个个扫描? 不必一次暂停所有goroutine栈
-- 写屏障的类型
-  - 插入写屏障
-  - 删除写屏障
-  - 混合写屏障
-- 创建的新对象是黑色还是白色?
-
-- 插入写屏障
-  - 栈上先STW然后标记完 + 新生成的对象都是黑色 + 堆上使用插入写屏障
-  - 堆上使用插入写屏障 + STW暂停，然后重新扫描一下栈
+- 分类步骤:
+  - STW扫描的位置点: 是在**开始扫描**还是在**最后来一次扫描**?
+  - STW扫描可以按照每个goroutine的方式来一个个扫描? 不必一次暂停所有goroutine栈
+    - STW goroutine栈扫描: 栈上对象都变成黑色,一些堆对象(与栈对联直连)为灰色,其他的为白色.// TODO picture
+  - 创建的新对象是黑色还是白色?
 
 
 - 防止类型就是:
   - heap_black_object -> heap_white_object
   - stack_black_object -> heap_white_object
 
-STW goroutine栈扫描: 栈上对象都变成黑色,一些堆对象(与栈对联直连)为灰色,其他的为白色.
-// TODO picture 
+---
+
+##### 插入写屏障
+
+开始步骤 | 步骤 | \ | 新生成对象的颜色
+-------|---------|----|------------
+STW全栈扫描 | 堆上使用插入写屏障 | \ |新生成的对象都是黑色
+STW goroutine栈扫描 | 堆上使用插入写屏障 | \ |新生成的对象都是黑色
+堆上使用插入写屏障 | STW全栈扫描 | \ |新生成的对象黑白都可
+堆上使用插入写屏障 | STW goroutine栈扫描 | \ |新生成的对象黑白都可
 
 
 ```sh
@@ -183,17 +198,24 @@ STW goroutine栈扫描: 栈上对象都变成黑色,一些堆对象(与栈对联
 ![20210404172432](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210404172432.png)
 
 
-
 (3)可以,1.5到1.7就是使用的这种方式
 (4)没必要了,都是最后STW,重新扫描一次灰色的goroutine栈
 
 
-
+##### 删除写屏障
 
 - 删除写屏障
   - 起始快照整栈跨找，扫黑，使得整个堆上的在用对象都处于灰色保护；
     - 整栈扫黑，那么在用的堆上的对象是一定处于灰色堆对象的保护下的，之后配合堆对象删除写屏障就能保证在用对象不丢失。
   - 加入插入写屏障的逻辑，C 指向 D 的时候，把 D 置灰，这样扫描也没问题。这样就能去掉起始 STW 扫描，从而可以并发，一个一个栈扫描。
+
+开始步骤 | 步骤 | \ | 新生成对象的颜色
+-------|---------|----|------------
+STW全栈扫描 | 堆上使用删除写屏障 | \ |新生成的对象都是黑色
+STW goroutine栈扫描 | 堆上使用删除写屏障 | \ |新生成的对象都是黑色
+堆上使用删除写屏障 | STW全栈扫描 | \ |新生成的对象黑白都可
+堆上使用删除写屏障 | STW goroutine栈扫描 | \ |新生成的对象黑白都可
+
 ```sh
 /**************(1)**************/ 
 {
@@ -229,10 +251,17 @@ STW goroutine栈扫描: 栈上对象都变成黑色,一些堆对象(与栈对联
 // TODO 
 
 
+##### 混合写屏障
+
 - hybrid write barrier
 
 > 由前面的删除写屏障(2),我们只要加上插入写屏障就能避免出现隐藏白色对象这种情况.
 >> 这个也是```if current stack is grey:```的由来.
+
+
+步骤 | 步骤 | \ | 新生成对象的颜色
+-------|---------|----|------------
+STW goroutine栈扫描(要么全黑要么全白) | 堆上使用删除写屏障+堆上使用插入写屏障 | \ |新生成的对象都是黑色
 
 ```go
 writePointer(slot, ptr):
@@ -241,13 +270,14 @@ writePointer(slot, ptr):
         shade(ptr)
     *slot = ptr
 ```
-- The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier).
+
+> The hybrid barrier requires that objects be allocated black (allocate-white is a common policy, but incompatible with this barrier).
 
 
 
+---
 
-
-- [其他的变种:](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#alternative-barrier-approaches)
+##### [其他的变种](https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md#alternative-barrier-approaches)
 
 ```go
 
@@ -270,56 +300,7 @@ writePointer(slot, ptr):
 
 
 
-
-
-栈上是没有写屏障的，
-<堆与栈之间>或者<堆与堆>才会触发写屏障
-
-
-- 一个是插入写屏障
-  - 破坏第一个条件
-  - 记住插入，---黑色----白色===》 黑色----灰色
-    ```go
-    writePointer(slot, ptr):
- 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
-	  *slot = ptr
-	```
-
----
-
-- 一个是删除写屏障
-  - 破坏第二个条件。
-  - 删除
-  ```go
-  writePointer(slot, ptr)
-  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
-  	*slot = ptr
-  ```
-  - disadvantage:
-    - which means that many stacks must be re-scanned during STW. The garbage collector first scans all stacks at the beginning of the GC cycle to collect roots.(第一次扫描所有的栈在收集根对象的时候，不能保证在栈后面不会有黑对象引用了白对象)
-
----
-
-- 混合写屏障
-  - what: 混合写屏障为了**消除栈的重扫**过程.
-  ```go
-  writePointer(slot, ptr):
-      shade(*slot)
-      if current stack is grey:
-          shade(ptr)
-      *slot = ptr
-  ```
-  - why: 
-
-  - how: 通过几种方式来保证弱三色一致性
-    - STW 扫描一次协程栈(扫一个Goroutine栈就变为黑色) + 创建对象默认黑色
-      - 开启写屏障期间创建的所有对象默认都是黑色
-    - 混合写屏障 + 两Goroutine之间交流
-
 ## golang实现
-
-
-
 
 https://docs.go101.org/std/src/runtime/mbarrier.go.html
 
@@ -363,9 +344,9 @@ https://docs.go101.org/std/src/runtime/mbarrier.go.html
 
 
 
-
-
 https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md
+
+
 
 
 ---
@@ -530,3 +511,54 @@ type heapArena struct {
 
 
 
+
+## archive
+
+~~堆（heap）上面的都有插入写屏障，不会发生hiding object。~~
+
+
+
+
+栈上是没有写屏障的，
+<堆与栈之间>或者<堆与堆>才会触发写屏障
+
+
+- 一个是插入写屏障
+  - 破坏第一个条件
+  - 记住插入，---黑色----白色===》 黑色----灰色
+    ```go
+    writePointer(slot, ptr):
+ 	  shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+	  *slot = ptr
+	```
+
+---
+
+- 一个是删除写屏障
+  - 破坏第二个条件。
+  - 删除
+  ```go
+  writePointer(slot, ptr)
+  	shade(*slot) //shade函数尝试改变指针的颜色-->改变slot的颜色--->注意这个是*slot,slot保存着它原先的保存的地址。
+  	*slot = ptr
+  ```
+  - disadvantage:
+    - which means that many stacks must be re-scanned during STW. The garbage collector first scans all stacks at the beginning of the GC cycle to collect roots.(第一次扫描所有的栈在收集根对象的时候，不能保证在栈后面不会有黑对象引用了白对象)
+
+---
+
+- 混合写屏障
+  - what: 混合写屏障为了**消除栈的重扫**过程.
+  ```go
+  writePointer(slot, ptr):
+      shade(*slot)
+      if current stack is grey:
+          shade(ptr)
+      *slot = ptr
+  ```
+  - why: 
+
+  - how: 通过几种方式来保证弱三色一致性
+    - STW 扫描一次协程栈(扫一个Goroutine栈就变为黑色) + 创建对象默认黑色
+      - 开启写屏障期间创建的所有对象默认都是黑色
+    - 混合写屏障 + 两Goroutine之间交流
