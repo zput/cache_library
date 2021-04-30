@@ -914,9 +914,42 @@ const 	flagKindMask    flag = 1<<flagKindWidth -
 
 #### context(上下文)
 
-
 [<sup>1</sup>](#refer-anchor2)
 // TODO
+
+- 四个方法
+```go
+type Context interface {
+	Deadline() (deadline time.Time, ok bool)
+	Done() <-chan struct{}  //返回一个channel.
+	Err() error
+	Value(key interface{}) interface{}
+}
+```
+- 内部Ctx
+  - cancelCtx
+    - WithCancel: **把父Context装进子Context's Context.**
+	```go
+    func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
+    	if parent == nil {
+    		panic("cannot create context from nil parent")
+    	}
+    	c := newCancelCtx(parent) // 常见一个新的子context；
+    	propagateCancel(parent, &c) // 然后准备把新生成的子context加入到parent中；
+    	return &c, func() { c.cancel(true, Canceled) }
+    }
+	```
+	  - <script src="https://gist.github.com/zput/27591a68b2384b63e14c92546394b6e7.js"></script> 
+	  - <script src="https://gist.github.com/zput/d798e8e43498944e3e77111198cdefde.js"></script>
+  - valueCtx
+    - WithValue:
+  - emptyCtx
+- <script src="https://gist.github.com/zput/0f89a600018cc5b6095f1b4ae77aca8e.js"></script>
+
+
+[这里需要说明的是type interface可以放进struct里面：](https://play.golang.org/p/tifKA0ruOR8)
+
+
 
 ### 内存管理
 
