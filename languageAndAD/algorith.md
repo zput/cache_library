@@ -199,6 +199,9 @@ https://www.zhihu.com/question/20729324
               in order to find 5's parent node:   (len(array)-1-1)/2
     ```
 
+注意只要一次全部堆排序(从底部开始的非叶子节点进行heapDown)，其余的只要根节点进行一次heapDown。
+
+
 
 
 ## 实操
@@ -207,6 +210,7 @@ https://www.zhihu.com/question/20729324
   - 三路快排：
     - https://play.golang.org/p/682cBXcpapw
   - 两路快排:
+    - https://play.golang.org/p/FDRJfWGTYs1
 
 - fibo
   - https://play.golang.org/p/0mg7NVyOf9f
@@ -489,16 +493,16 @@ func heapSort(array []int) {
 	if len(array) <= 1 {
 		return
 	}
-	/*
+/*
  _ _ _ _ _ _
 |_ _ _ _ _ _|
  0 1 2 3 4 5
           len(array)-1 is 5
-	      in order to find 5's parent node:
-	      (len(array)-1-1)/2
-	like:
-	 0
-	/ |
+          in order to find 5's parent node:
+          (len(array)-1-1)/2
+    like:
+    0
+   / |
   1   2
  / \ / \
 3  4 5  6
@@ -508,9 +512,9 @@ func heapSort(array []int) {
   - right child's node = parent's node * 2 + 2
 通过这个例子来想这些公式，不需要硬记住。
 
-	当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
+当比较左右子树的时候，使用类似指针的东西，最后才用交换（记住指针）
 
-	*/
+*/
 	for i := (len(array)-1-1) / 2; i >= 0; i-- {
 		heapDown(array, len(array), i)
 	}
