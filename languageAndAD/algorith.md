@@ -729,4 +729,43 @@ func printArray(array []int){
 
 
 
+- 将整数转换二进制 然后将负数:
+  - https://leetcode-cn.com/problems/convert-a-number-to-hexadecimal/solution/can-kao-bie-ren-de-si-lu-si-lu-zhen-de-j-7hhb/
+- 买卖股票的最大利润
+  - 给定一个数组代表股票每天的价格，请问买卖多次的情况下，最大化利润是多少？ 日期不重叠的情况下，可以买卖多次? 输入: {100, 80, 120, 130, 70, 60, 100, 125} 可以买卖多次: 115（80买进，130卖出；60 买进，125卖出） 提示：不用输出买卖的序列，只需要得到最大利润
+- 【LeetCode】148. 排序链表
+- 【LeetCode】215. 数组中的第K个最大元素（高频) 需要手写小顶堆，不能用库函数
+
+
+
+
+
+
+
+
+
+
+```go
+func toHex(num int) string {
+	if num == 0 {
+		return "0"
+	}
+	s := "0123456789abcdef"
+	ans := ""
+	for num != 0 && len(ans) < 8 {
+		ans = string(s[num&15]) + ans
+		num >>= 4
+	}
+	return ans
+}
+```
+
+
+
+
+
+
+
+
+
 
