@@ -120,6 +120,55 @@ string类型的底层结构.它的大小是几个字节?
 1110xxxx 10xxxxxx 10xxxxxx
 ```
 
+```go
+package main
+
+import (
+	"fmt"
+	"reflect"
+	"unicode/utf8"
+	"unsafe"
+)
+
+func String2Bytes(s string) []byte {
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh := reflect.SliceHeader{
+		Data: sh.Data,
+		Len:  sh.Len,
+		Cap:  sh.Len,
+	}
+	return *(*[]byte)(unsafe.Pointer(&bh))
+}
+
+func Bytes2String(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func main(){
+	var str = "hello 就是"
+	fmt.Println("--->", len(str))
+
+	fmt.Println("--->", len([]rune(str)))
+
+	// 报错cannot convert str (type string) to type []int64
+	//fmt.Println("--->", len([]int64(str)))
+
+	//golang中的unicode/utf8包提供了用utf-8获取长度的方法
+	fmt.Println("RuneCountInString:", utf8.RuneCountInString(str))
+}
+/*
+string 的底层就是uint8的数组指针+长度
+
+预期想得到一个字符串的长度而不是字符串底层占得字节长度：
+  1。 utf8.RuneCountInString()函数
+  2。 []rune(stringxxx) or []int32(stringxxx)
+*/
+```
+
+- [345. 反转字符串中的元音字母](https://leetcode-cn.com/problems/reverse-vowels-of-a-string/)
+
+
+
 ### slice和数组的异同
 
 
