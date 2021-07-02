@@ -167,7 +167,47 @@ string 的底层就是uint8的数组指针+长度
 
 - [345. 反转字符串中的元音字母](https://leetcode-cn.com/problems/reverse-vowels-of-a-string/)
 
+#### 单引号
 
+ 单引号，表示byte类型或rune类型，对应 uint8和int32类型，默认是 rune 类型。byte用来强调数据是raw data，而不是数字；而rune用来表示Unicode的code point。
+
+
+```go
+package main
+
+import (
+    "fmt"
+    "reflect"
+    "unsafe"
+)
+
+func main() {
+    //String in double quotes
+    x := "tit\nfor\ttat"
+    fmt.Println("Priting String in Double Quotes:")
+    fmt.Printf("x is: %s\n", x)
+    
+   //String in back quotes
+    y := `tit\nfor\ttat`
+    fmt.Println("\nPriting String in Back Quotes:")
+    fmt.Printf("y is: %s\n", y)
+   
+    //Declaring a byte with single quotes
+    var b byte = 'a'
+    fmt.Println("\nPriting Byte:")
+    //Print Size, Type and Character
+    fmt.Printf("Size: %d\nType: %s\nCharacter: %c\n", unsafe.Sizeof(b), reflect.TypeOf(b), b)
+    
+    //Declaring a rune with single quotes
+    r := '£'
+    fmt.Println("\nPriting Rune:")
+    //Print Size, Type, CodePoint and Character
+    fmt.Printf("Size: %d\nType: %s\nUnicode CodePoint: %U\nCharacter: %c\n", unsafe.Sizeof(r), reflect.TypeOf(r), r, r)
+    //Below will raise a compiler error - invalid character literal (more than one character)
+    //r = 'ab'
+}
+```
+- https://golangbyexample.com/double-single-back-quotes-go/ 
 
 ### slice和数组的异同
 

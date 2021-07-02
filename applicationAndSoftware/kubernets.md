@@ -4,6 +4,9 @@
 
 <!-- code_chunk_output -->
 
+- [安装](#安装)
+- [CRD](#crd)
+  - [crd's exercise](#crds-exercise)
 - [一个目标：容器操作](#一个目标容器操作httpscloudtencentcomdeveloperarticle1415035)
   - [实践](#实践httpszhuanlanzhihucomp363978095)
 - [四个网络关系:container,pod,service,internet](#四个网络关系containerpodserviceinternet)
@@ -25,10 +28,53 @@
       - [service](#service)
       - [Headless Services](#headless-serviceshttpskubernetesiodocsconceptsservices-networkingserviceheadless-services)
 - [vxlan协议格式](#vxlan协议格式)
+- [CRD](#crd-1)
 
 <!-- /code_chunk_output -->
 
 
+## 安装
+
+https://github.com/easzlab/kubeasz
+
+
+## CRD
+
+https://blog.csdn.net/aixiaoyang168/article/details/81875907
+
+https://github.com/kubernetes-sigs/kubebuilder
+
+https://book.kubebuilder.io/quick-start.html
+
+
+https://kuboard.cn/install/install-kubernetes.html#%E6%A3%80%E6%9F%A5%E7%BD%91%E7%BB%9C
+
+https://www.bookstack.cn/read/source-code-reading-notes/kubernetes-kubelet_garbage_collect.md
+
+
+### crd's exercise
+
+```sh
+[root@iZf8z14idfp0rwhiicngwqZ k8s-cronjob]# make undeploy
+/root/code/go_tmp/awesomeProject/example/k8s-cronjob/bin/kustomize build config/default | kubectl delete -f -
+namespace "k8s-cronjob-system" deleted
+customresourcedefinition.apiextensions.k8s.io "cronjobs.batch.tutorial.kubebuilder.io" deleted
+serviceaccount "k8s-cronjob-controller-manager" deleted
+role.rbac.authorization.k8s.io "k8s-cronjob-leader-election-role" deleted
+clusterrole.rbac.authorization.k8s.io "k8s-cronjob-manager-role" deleted
+clusterrole.rbac.authorization.k8s.io "k8s-cronjob-metrics-reader" deleted
+clusterrole.rbac.authorization.k8s.io "k8s-cronjob-proxy-role" deleted
+rolebinding.rbac.authorization.k8s.io "k8s-cronjob-leader-election-rolebinding" deleted
+clusterrolebinding.rbac.authorization.k8s.io "k8s-cronjob-manager-rolebinding" deleted
+clusterrolebinding.rbac.authorization.k8s.io "k8s-cronjob-proxy-rolebinding" deleted
+configmap "k8s-cronjob-manager-config" deleted
+service "k8s-cronjob-controller-manager-metrics-service" deleted
+deployment.apps "k8s-cronjob-controller-manager" deleted
+```
+
+
+
+https://feisky.gitbooks.io/kubernetes/content/introduction/cluster.html
 
 ## [一个目标：容器操作](https://cloud.tencent.com/developer/article/1415035)
 
@@ -209,6 +255,41 @@ https://blog.csdn.net/Aimee_c/article/details/106964337
 
 
 
+
+
+
+
+
+
+## CRD
+
+
+
+
+https://git.forchange.cn/linweiqi/sandbox-debug-bridge/-/blob/master/main.go
+
+https://git.forchange.cn/runtime/test/sandbox_test/-/issues/1#5gatewayoperator
+
+
+https://stackoverflow.com/questions/47848258/what-is-the-difference-between-a-kubernetes-controller-and-a-kubernetes-operator
+
+It's only an Operator if it's got: controller pattern + API extension + single-app focus.
+
+An Operator is a controller. It's just that when the controller adds new k8s objects to store configuration for a component like prometheus or memcached, they use the term Operator. **A controller** normally **just watches** and **reacts** to native k8s objects.
+
+
+
+- The list of controller in the Control-plane:
+  - Deployment
+  - ReplicaSet
+  - StatefulSet
+  - DaemonSet
+  - etc
+
+- From the Google Search, I found out that there are K8s Operators such as
+  - etcd Operator
+  - Prometheus Operator
+  - kong Operators
 
 
 
