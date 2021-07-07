@@ -29,6 +29,7 @@
       - [Headless Services](#headless-serviceshttpskubernetesiodocsconceptsservices-networkingserviceheadless-services)
 - [vxlan协议格式](#vxlan协议格式)
 - [CRD](#crd-1)
+    - [需要更近一步探寻的](#需要更近一步探寻的)
 
 <!-- /code_chunk_output -->
 
@@ -290,6 +291,33 @@ An Operator is a controller. It's just that when the controller adds new k8s obj
   - etcd Operator
   - Prometheus Operator
   - kong Operators
+
+
+
+
+
+#### 需要更近一步探寻的
+
+
+```go
+	sb := &corev2alpha1.Sandbox{}
+  why ? new(corev2alpha1.Sandbox)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
