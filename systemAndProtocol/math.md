@@ -2,9 +2,7 @@
 
 ## hight math
 
-
 https://www.latexlive.com/##
-
 
 #### function-limitation-continuous
 
@@ -12,18 +10,15 @@ https://www.latexlive.com/##
 - 极限的存在：根据定义，当$x->x_0$ 的时候$|f(x)-A|<\varepsilon$.
   - 这里是趋向一个常数A。;且这里不要把连续的一些概念混淆了，比如左右极限需相等啥的。
 
-
-![极限：x->x0](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714195652.png)
-![极限：x->∞](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714195652.png)
-
-<img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714195652.png" width = "60%" alt="效果图" align=left />
-
-<img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714201724.png" width = "60%" alt="效果图" align=right />
-
+>sequence limit
+>function limitation
+>> $x->x_0$
+>>> ![极限：x->x0](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714195652.png)
+>> $x->\infty$
+>> ![极限：x->∞](https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210714201724.png)
 
 
 ---
-
 
 QA:
 - 为什么 $|x-x_0|>0$ ,不能等于 $x==x_0$?
