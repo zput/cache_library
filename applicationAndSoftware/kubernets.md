@@ -29,6 +29,7 @@
       - [Headless Services](#headless-serviceshttpskubernetesiodocsconceptsservices-networkingserviceheadless-services)
 - [vxlan协议格式](#vxlan协议格式)
 - [CRD](#crd-1)
+      - [api version](#api-version)
     - [需要更近一步探寻的](#需要更近一步探寻的)
 
 <!-- /code_chunk_output -->
@@ -292,9 +293,50 @@ An Operator is a controller. It's just that when the controller adds new k8s obj
   - Prometheus Operator
   - kong Operators
 
+---
+
+  kuberbetes1.15 中，关于 Deployment 你可以写
+  "apiVersion: extensions/v1beta1 "，
+  "apiVersion: apps/v1beta1"，
+  "apiVersion: apps/v1"，
+  同样意味着你可以通过以下这些 API 路由访问到
+  /apis/extensions/v1beta1/--->namespaces/default/deployments
+  /apis/apps/v1beta1/--->namespaces/default/deployments
+  /apis/apps/v1/--->namespaces/default/
+
+
+https://www.shangyexinzhi.com/article/394716.html
+https://www.sohu.com/a/364349985_684389
+https://www.shangyexinzhi.com/article/413891.html
 
 
 
+![k8s-restful](https://i.loli.net/2021/07/09/vrG7y3hgqjJAQkB.png)
+
+[CRD](https://gzh.readthedocs.io/en/latest/blogs/Kubernetes/2020-09-26-%E4%BD%BF%E7%94%A8client-go%E8%AE%BF%E9%97%AEk8s%E9%9B%86%E7%BE%A4%E4%B8%AD%E7%9A%84CRD.html)
+
+[client-go serial blog](https://gzh.readthedocs.io/en/latest/blogs/Kubernetes/2020-10-11-client-go%E7%B3%BB%E5%88%97%E4%B9%8B1---client-go%E4%BB%A3%E7%A0%81%E8%AF%A6%E8%A7%A3.html)
+
+[demo about k8s-client-go including CRD](https://github.com/zput/k8s-client-go)
+[demo about k8s-demo](https://github.com/zput/k8s-demo)
+- 定义类型
+- 定义DeepCopy方法
+  - Kubernetes API 所服务的每个类型（在本例中，Project 和 ProjectList）都需要实现 k8s.io/apimachinery/pkg/runtime.Object 接口。这个接口定义了两个方法GetObjectKind()和DeepCopyObject()。第一个方法已经由内嵌的metav1.TypeMeta结构提供了；第二个方法你必须自己实现。
+  - DeepCopyObject方法的目的是生成一个对象的深度拷贝。由于这涉及到大量的模板代码，所以这些方法通常是自动生成的。在本文中，我们将手动进行。继续在同一个包中添加第二个文件 deepcopy.go。
+- 注册类型
+  - 接下来，你需要让客户端库知道你的新类型。这将允许客户端在与API服务器通信时（或多或少）自动处理你的新类型。
+  - 为此，在你的包中添加一个新文件 register.go。
+
+[kube-builder-book-chinese](https://cloudnative.to/kubebuilder/cronjob-tutorial/controller-implementation.html)
+
+[which-api-group-in-k8s](https://stackoverflow.com/questions/57821065/which-api-group-in-k8s)
+##### api version 
+
+https://kubernetes.io/zh/docs/reference/using-api/api-concepts/
+
+https://cloud.tencent.com/developer/article/1674960
+
+https://www.cnblogs.com/elnino/p/9578017.html
 
 #### 需要更近一步探寻的
 
